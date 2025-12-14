@@ -1,6 +1,7 @@
 package main
 
 import (
+	"better-uptime/cmd/redis"
 	"better-uptime/config"
 	"better-uptime/internal/api"
 	db "better-uptime/internal/db/sqlc"
@@ -20,6 +21,8 @@ func main() {
 	}
 	fmt.Println("Connecting to DB:", cfg.POSTGRES_CONNECTION)
 
+	rdb:= redis.RedisConnect(cfg.REDIS_DB_URL, cfg.REDIS_PASSWORD)
+
 	// Connect to DB
 	pool, err := pgxpool.New(context.Background(), cfg.POSTGRES_CONNECTION)
 	if err != nil {
@@ -31,7 +34,7 @@ func main() {
 	store := db.NewStore(pool)
 
 	// Start server
-	server := api.NewServer(store, cfg)
+	server := api.NewServer(store, cfg, *rdb)
 	fmt.Printf("Server running on port %s\n", cfg.PORT)
 	if err := server.Start(); err != nil {
 		log.Fatalf("Server failed: %v", err)
