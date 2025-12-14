@@ -56,7 +56,8 @@ CREATE TABLE trainSchedule (
     id  SERIAL PRIMARY KEY,
     trainId INTEGER REFERENCES train(id) ON DELETE CASCADE,
     day day_of_week NOT NULL,
-    arrivalTime  TIMESTAMP NOT NULL,
+    arrivalTime  TIME NOT NULL,
+    departureTime TIME NOT NULL,
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
 
@@ -125,3 +126,9 @@ ON DELETE RESTRICT;
 CREATE UNIQUE INDEX idx_train_number ON train(trainNumber);
 CREATE INDEX idx_train_src ON train(source);
 CREATE INDEX idx_train_dest ON train(destination);
+
+CREATE INDEX idx_booking_user ON booking(userId);
+CREATE INDEX idx_booking_train_date ON booking(trainId, travelDate);
+CREATE INDEX idx_booking_status ON booking(status);
+CREATE INDEX idx_payment_status ON payment(status);
+CREATE INDEX idx_bookingitem_schedule ON bookingItem(trainScheduleId);
