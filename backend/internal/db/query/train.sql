@@ -9,13 +9,13 @@ VALUES ( $1 ,$2 ,$3,$4)
 RETURNING *;
 
 -- name: GetTrainById :one
-SELECT * FRON train
+SELECT * FROM train
 WHERE id = $1;
--- name: CreateCoach : one
-INSERT into coach (trainId,coachtype,coachNumber) VALUES ($1 , $2 , $3);
+-- name: CreateCoach :one
+INSERT into coach (trainId,coachtype,coachNumber) VALUES ($1 , $2 , $3) RETURNING *;
 
--- name: CreateSeat : one
-INSERT into seat (coachId,seatno,berth) VALUES ($1 , $2 , $3);
+-- name: CreateSeat :one
+INSERT into seat (coachId,seatno,berth) VALUES ($1 , $2 , $3) RETURNING *;
 
 -- name: GetTrainScheduleByDay :one
 SELECT * FROM trainSchedule

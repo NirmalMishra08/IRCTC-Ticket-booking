@@ -31,16 +31,18 @@ CREATE TYPE payment_status AS ENUM (
     'SUCCESS'
 );
 
-CREATE TABLE user (
+CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fullname TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    roles user_role NOT NULL DEFAULT 'USER',
+    role user_role NOT NULL DEFAULT 'USER',
     password_hash TEXT ,
     provider provider NOT NULL,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
 );
+
+ALTER table users ADD COLUMN phone TEXT ;
 
 
 CREATE TABLE train (
@@ -56,8 +58,8 @@ CREATE TABLE trainSchedule (
     id  SERIAL PRIMARY KEY,
     trainId INTEGER REFERENCES train(id) ON DELETE CASCADE,
     day day_of_week NOT NULL,
-    arrivalTime  TIME NOT NULL,
-    departureTime TIME NOT NULL,
+    arrivalTime  TIMESTAMPTZ NOT NULL,
+    departureTime TIMESTAMPTZ NOT NULL,
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
 
@@ -96,7 +98,7 @@ CREATE Table payment (
 
 CREATE TABLE booking (
     id SERIAL PRIMARY KEY,
-    userId UUID REFERENCES user(id) ON DELETE RESTRICT,
+    userId UUID REFERENCES users(id) ON DELETE RESTRICT,
     trainId INTEGER REFERENCES train(id) ON DELETE RESTRICT,
     travelDate DATE NOT NULL,
     status booking_status NOT NULL DEFAULT 'PENDING',

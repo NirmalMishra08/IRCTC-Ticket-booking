@@ -1,4 +1,4 @@
--- name: CreateBooking: one
+-- name: CreateBooking :one
 INSERT INTO booking (userId, trainId, travelDate, status, holdToken)
 VALUES ($1, $2, $3, 'PENDING', $4)
 RETURNING *;
@@ -20,8 +20,8 @@ SELECT * FROM booking WHERE holdToken = $1;
 SELECT bi.seatId
 FROM bookingItem bi
 JOIN booking b on bi.bookingId = b.id
- WHERE b.trainId = $2 AND
-  b.travelDate = $3
+ WHERE b.trainId = $1 AND
+  b.travelDate = $2
   AND b.status IN('PENDING','CONFIRMED');
 
 -- name: GetBookingbyUserId :many

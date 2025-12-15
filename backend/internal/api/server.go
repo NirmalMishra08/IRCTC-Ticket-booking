@@ -6,6 +6,8 @@ import (
 
 	"better-uptime/config"
 	"better-uptime/internal/api/auth"
+	"better-uptime/internal/api/booking"
+	"better-uptime/internal/api/train"
 	db "better-uptime/internal/db/sqlc"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +20,8 @@ type Server struct {
 	rdb         redis.Client
 	router      *chi.Mux
 	authHandler *auth.Handler
+	trainHandler *train.Handler
+	bookingHandler *booking.Handler
 }
 
 type ServerConfig struct {
@@ -43,6 +47,7 @@ func NewServer(store db.Store, cfg *config.Config, rdb redis.Client) *Server {
 
 	// Initialize the auth handler with only required dependencies
 	server.authHandler = auth.NewHandler(cfg, store)
+	server.bookingHandler = booking.NewHandler(cfg,store,rdb)
 
 	// You can now mount auth routes here like:
 	// r.Post("/login", server.authHandler.Login)
