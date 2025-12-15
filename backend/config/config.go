@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	PORT               string
+	PORT                string
 	POSTGRES_CONNECTION string
+	REDIS_DB_URL        string
+	REDIS_PASSWORD      string
 }
 
 func LoadConfig() *Config {
@@ -18,8 +20,10 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		PORT:               getEnv("PORT", "8080"),
+		PORT:                getEnv("PORT", "8080"),
 		POSTGRES_CONNECTION: getEnv("POSTGRES_CONNECTION", ""),
+		REDIS_DB_URL:        getEnv("REDIS_DB_URL", ""),
+		REDIS_PASSWORD:      getEnv("REDIS_PASSWORD", ""),
 	}
 }
 

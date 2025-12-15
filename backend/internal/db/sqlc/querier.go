@@ -12,15 +12,28 @@ import (
 )
 
 type Querier interface {
+	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
+	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
+	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
+	CreateSeat(ctx context.Context, arg CreateSeatParams) (Seat, error)
+	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
+	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error)
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)
+	GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow, error)
+	GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error)
+	GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error)
+	GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error)
+	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
+	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
+	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
+	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
+	GetTrainById(ctx context.Context, id int32) (Train, error)
+	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
-	GetUserProfile(ctx context.Context, userID pgtype.UUID) (UserProfile, error)
-	UpdatePremiumStatus(ctx context.Context, arg UpdatePremiumStatusParams) (UserProfile, error)
+	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
-	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UserProfile, error)
 }
 
 var _ Querier = (*Queries)(nil)

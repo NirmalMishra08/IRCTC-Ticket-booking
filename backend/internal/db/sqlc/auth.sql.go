@@ -13,7 +13,7 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, phone, email, fullname, provider, password_hash, role, profile_status, created_at, updated_at
+INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, fullname, email, role, password_hash, provider, created_at, updated_at, phone
 `
 
 type CreateUserParams struct {
@@ -26,15 +26,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Phone,
-		&i.Email,
 		&i.Fullname,
-		&i.Provider,
-		&i.PasswordHash,
+		&i.Email,
 		&i.Role,
-		&i.ProfileStatus,
+		&i.PasswordHash,
+		&i.Provider,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Phone,
 	)
 	return i, err
 }
@@ -92,7 +91,7 @@ func (q *Queries) FindOrCreateUser(ctx context.Context, arg FindOrCreateUserPara
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, phone, email, fullname, provider, password_hash, role, profile_status, created_at, updated_at FROM users WHERE email = $1
+SELECT id, fullname, email, role, password_hash, provider, created_at, updated_at, phone FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -100,21 +99,20 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Phone,
-		&i.Email,
 		&i.Fullname,
-		&i.Provider,
-		&i.PasswordHash,
+		&i.Email,
 		&i.Role,
-		&i.ProfileStatus,
+		&i.PasswordHash,
+		&i.Provider,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Phone,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, phone, email, fullname, provider, password_hash, role, profile_status, created_at, updated_at FROM users 
+SELECT id, fullname, email, role, password_hash, provider, created_at, updated_at, phone FROM users 
 WHERE id = $1
 `
 
@@ -123,15 +121,14 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Phone,
-		&i.Email,
 		&i.Fullname,
-		&i.Provider,
-		&i.PasswordHash,
+		&i.Email,
 		&i.Role,
-		&i.ProfileStatus,
+		&i.PasswordHash,
+		&i.Provider,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Phone,
 	)
 	return i, err
 }

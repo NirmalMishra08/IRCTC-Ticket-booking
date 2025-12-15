@@ -7,104 +7,240 @@ package db
 import (
 	"database/sql/driver"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type MonitorStatus string
+type BerthType string
 
 const (
-	MonitorStatusUp      MonitorStatus = "up"
-	MonitorStatusDown    MonitorStatus = "down"
-	MonitorStatusUnknown MonitorStatus = "unknown"
-	MonitorStatusPending MonitorStatus = "pending"
+	BerthTypeUP   BerthType = "UP"
+	BerthTypeDOWN BerthType = "DOWN"
+	BerthTypeMID  BerthType = "MID"
 )
 
-func (e *MonitorStatus) Scan(src interface{}) error {
+func (e *BerthType) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = MonitorStatus(s)
+		*e = BerthType(s)
 	case string:
-		*e = MonitorStatus(s)
+		*e = BerthType(s)
 	default:
-		return fmt.Errorf("unsupported scan type for MonitorStatus: %T", src)
+		return fmt.Errorf("unsupported scan type for BerthType: %T", src)
 	}
 	return nil
 }
 
-type NullMonitorStatus struct {
-	MonitorStatus MonitorStatus `json:"monitor_status"`
-	Valid         bool          `json:"valid"` // Valid is true if MonitorStatus is not NULL
+type NullBerthType struct {
+	BerthType BerthType `json:"berth_type"`
+	Valid     bool      `json:"valid"` // Valid is true if BerthType is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullMonitorStatus) Scan(value interface{}) error {
+func (ns *NullBerthType) Scan(value interface{}) error {
 	if value == nil {
-		ns.MonitorStatus, ns.Valid = "", false
+		ns.BerthType, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.MonitorStatus.Scan(value)
+	return ns.BerthType.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullMonitorStatus) Value() (driver.Value, error) {
+func (ns NullBerthType) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.MonitorStatus), nil
+	return string(ns.BerthType), nil
 }
 
-type ProfileStatus string
+type BookingStatus string
 
 const (
-	ProfileStatusPENDING   ProfileStatus = "PENDING"
-	ProfileStatusCOMPLETED ProfileStatus = "COMPLETED"
+	BookingStatusPENDING   BookingStatus = "PENDING"
+	BookingStatusCONFIRMED BookingStatus = "CONFIRMED"
+	BookingStatusCANCELLED BookingStatus = "CANCELLED"
+	BookingStatusEXPIRED   BookingStatus = "EXPIRED"
 )
 
-func (e *ProfileStatus) Scan(src interface{}) error {
+func (e *BookingStatus) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = ProfileStatus(s)
+		*e = BookingStatus(s)
 	case string:
-		*e = ProfileStatus(s)
+		*e = BookingStatus(s)
 	default:
-		return fmt.Errorf("unsupported scan type for ProfileStatus: %T", src)
+		return fmt.Errorf("unsupported scan type for BookingStatus: %T", src)
 	}
 	return nil
 }
 
-type NullProfileStatus struct {
-	ProfileStatus ProfileStatus `json:"profile_status"`
-	Valid         bool          `json:"valid"` // Valid is true if ProfileStatus is not NULL
+type NullBookingStatus struct {
+	BookingStatus BookingStatus `json:"booking_status"`
+	Valid         bool          `json:"valid"` // Valid is true if BookingStatus is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullProfileStatus) Scan(value interface{}) error {
+func (ns *NullBookingStatus) Scan(value interface{}) error {
 	if value == nil {
-		ns.ProfileStatus, ns.Valid = "", false
+		ns.BookingStatus, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.ProfileStatus.Scan(value)
+	return ns.BookingStatus.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullProfileStatus) Value() (driver.Value, error) {
+func (ns NullBookingStatus) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.ProfileStatus), nil
+	return string(ns.BookingStatus), nil
+}
+
+type CoachType string
+
+const (
+	CoachType3A CoachType = "3A"
+	CoachType2A CoachType = "2A"
+	CoachType1A CoachType = "1A"
+	CoachTypeSL CoachType = "SL"
+	CoachTypeGN CoachType = "GN"
+)
+
+func (e *CoachType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CoachType(s)
+	case string:
+		*e = CoachType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CoachType: %T", src)
+	}
+	return nil
+}
+
+type NullCoachType struct {
+	CoachType CoachType `json:"coach_type"`
+	Valid     bool      `json:"valid"` // Valid is true if CoachType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCoachType) Scan(value interface{}) error {
+	if value == nil {
+		ns.CoachType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CoachType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCoachType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CoachType), nil
+}
+
+type DayOfWeek string
+
+const (
+	DayOfWeekMON DayOfWeek = "MON"
+	DayOfWeekTUE DayOfWeek = "TUE"
+	DayOfWeekWED DayOfWeek = "WED"
+	DayOfWeekTHU DayOfWeek = "THU"
+	DayOfWeekFRI DayOfWeek = "FRI"
+	DayOfWeekSAT DayOfWeek = "SAT"
+	DayOfWeekSUN DayOfWeek = "SUN"
+)
+
+func (e *DayOfWeek) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DayOfWeek(s)
+	case string:
+		*e = DayOfWeek(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DayOfWeek: %T", src)
+	}
+	return nil
+}
+
+type NullDayOfWeek struct {
+	DayOfWeek DayOfWeek `json:"day_of_week"`
+	Valid     bool      `json:"valid"` // Valid is true if DayOfWeek is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDayOfWeek) Scan(value interface{}) error {
+	if value == nil {
+		ns.DayOfWeek, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DayOfWeek.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDayOfWeek) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DayOfWeek), nil
+}
+
+type PaymentStatus string
+
+const (
+	PaymentStatusPENDING PaymentStatus = "PENDING"
+	PaymentStatusFAILED  PaymentStatus = "FAILED"
+	PaymentStatusSUCCESS PaymentStatus = "SUCCESS"
+)
+
+func (e *PaymentStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentStatus(s)
+	case string:
+		*e = PaymentStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentStatus: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentStatus struct {
+	PaymentStatus PaymentStatus `json:"payment_status"`
+	Valid         bool          `json:"valid"` // Valid is true if PaymentStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentStatus), nil
 }
 
 type Provider string
 
 const (
-	ProviderEmail     Provider = "email"
-	ProviderGooglecom Provider = "google.com"
-	ProviderApple     Provider = "apple"
-	ProviderPassword  Provider = "password"
+	ProviderEMAIL    Provider = "EMAIL"
+	ProviderAPPLE    Provider = "APPLE"
+	ProviderPASSWORD Provider = "PASSWORD"
 )
 
 func (e *Provider) Scan(src interface{}) error {
@@ -184,120 +320,78 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
-type UserStatus string
-
-const (
-	UserStatusHttp    UserStatus = "http"
-	UserStatusPing    UserStatus = "ping"
-	UserStatusPending UserStatus = "pending"
-)
-
-func (e *UserStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = UserStatus(s)
-	case string:
-		*e = UserStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for UserStatus: %T", src)
-	}
-	return nil
-}
-
-type NullUserStatus struct {
-	UserStatus UserStatus `json:"user_status"`
-	Valid      bool       `json:"valid"` // Valid is true if UserStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullUserStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.UserStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.UserStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullUserStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.UserStatus), nil
-}
-
-type Alert struct {
-	ID        int32            `json:"id"`
-	MonitorID pgtype.Int4      `json:"monitor_id"`
-	AlertType pgtype.Text      `json:"alert_type"`
-	Message   pgtype.Text      `json:"message"`
-	SentAt    pgtype.Timestamp `json:"sent_at"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-}
-
-type Analytic struct {
-	ID               int32            `json:"id"`
-	MonitorID        pgtype.Int4      `json:"monitor_id"`
-	UptimePercentage pgtype.Float8    `json:"uptime_percentage"`
-	AvgResponseTime  pgtype.Float8    `json:"avg_response_time"`
-	Last24hDowntime  pgtype.Int4      `json:"last_24h_downtime"`
-	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
-}
-
-type Monitor struct {
-	ID        int32             `json:"id"`
-	UserID    pgtype.UUID       `json:"user_id"`
-	Url       string            `json:"url"`
-	Method    pgtype.Text       `json:"method"`
-	Type      pgtype.Text       `json:"type"`
-	Interval  int32             `json:"interval"`
-	Status    NullMonitorStatus `json:"status"`
-	IsActive  pgtype.Bool       `json:"is_active"`
-	CreatedAt pgtype.Timestamp  `json:"created_at"`
-	UpdatedAt pgtype.Timestamp  `json:"updated_at"`
-}
-
-type MonitorLog struct {
-	ID            int32            `json:"id"`
-	MonitorID     pgtype.Int4      `json:"monitor_id"`
-	StatusCode    pgtype.Int4      `json:"status_code"`
-	ResponseTime  pgtype.Float8    `json:"response_time"`
-	DnsOk         pgtype.Bool      `json:"dns_ok"`
-	SslOk         pgtype.Bool      `json:"ssl_ok"`
-	ContentOk     pgtype.Bool      `json:"content_ok"`
-	ScreenshotUrl pgtype.Text      `json:"screenshot_url"`
-	CheckedAt     pgtype.Timestamp `json:"checked_at"`
-}
-
-type Subscription struct {
+type Booking struct {
 	ID         int32            `json:"id"`
-	UserID     pgtype.UUID      `json:"user_id"`
-	StripePlan pgtype.Text      `json:"stripe_plan"`
-	IsActive   pgtype.Bool      `json:"is_active"`
-	CreatedAt  pgtype.Timestamp `json:"created_at"`
+	Userid     pgtype.UUID      `json:"userid"`
+	Trainid    pgtype.Int4      `json:"trainid"`
+	Traveldate pgtype.Date      `json:"traveldate"`
+	Status     BookingStatus    `json:"status"`
+	Holdtoken  pgtype.Text      `json:"holdtoken"`
+	Paymentid  pgtype.Int4      `json:"paymentid"`
+	Createdat  pgtype.Timestamp `json:"createdat"`
+}
+
+type Bookingitem struct {
+	ID              int32       `json:"id"`
+	Bookingid       pgtype.Int4 `json:"bookingid"`
+	Seatid          pgtype.Int4 `json:"seatid"`
+	Trainscheduleid pgtype.Int4 `json:"trainscheduleid"`
+}
+
+type Coach struct {
+	ID          int32       `json:"id"`
+	Trainid     pgtype.Int4 `json:"trainid"`
+	Coachtype   CoachType   `json:"coachtype"`
+	Coachnumber int32       `json:"coachnumber"`
+}
+
+type Payment struct {
+	ID            int32             `json:"id"`
+	Bookingid     pgtype.Int4       `json:"bookingid"`
+	Amount        float64           `json:"amount"`
+	Status        NullPaymentStatus `json:"status"`
+	Transactionid string            `json:"transactionid"`
+	Createdat     pgtype.Timestamp  `json:"createdat"`
+}
+
+type Seat struct {
+	ID      int32       `json:"id"`
+	Coachid pgtype.Int4 `json:"coachid"`
+	Seatno  int32       `json:"seatno"`
+	Berth   BerthType   `json:"berth"`
+}
+
+type Tatkal struct {
+	ID         int32       `json:"id"`
+	Trainid    pgtype.Int4 `json:"trainid"`
+	Coachtype  CoachType   `json:"coachtype"`
+	Totalseats pgtype.Int4 `json:"totalseats"`
+}
+
+type Train struct {
+	ID          int32  `json:"id"`
+	Trainnumber int32  `json:"trainnumber"`
+	Trainname   string `json:"trainname"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+}
+
+type Trainschedule struct {
+	ID            int32       `json:"id"`
+	Trainid       pgtype.Int4 `json:"trainid"`
+	Day           DayOfWeek   `json:"day"`
+	Arrivaltime   time.Time   `json:"arrivaltime"`
+	Departuretime time.Time   `json:"departuretime"`
 }
 
 type User struct {
-	ID            uuid.UUID          `json:"id"`
-	Phone         pgtype.Text        `json:"phone"`
-	Email         string             `json:"email"`
-	Fullname      string             `json:"fullname"`
-	Provider      Provider           `json:"provider"`
-	PasswordHash  pgtype.Text        `json:"password_hash"`
-	Role          UserRole           `json:"role"`
-	ProfileStatus NullProfileStatus  `json:"profile_status"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-}
-
-type UserProfile struct {
-	ID        int32            `json:"id"`
-	UserID    pgtype.UUID      `json:"user_id"`
-	IsPremium pgtype.Bool      `json:"is_premium"`
-	StripeID  pgtype.Text      `json:"stripe_id"`
-	Name      pgtype.Text      `json:"name"`
-	Bio       pgtype.Text      `json:"bio"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID           uuid.UUID        `json:"id"`
+	Fullname     string           `json:"fullname"`
+	Email        string           `json:"email"`
+	Role         UserRole         `json:"role"`
+	PasswordHash pgtype.Text      `json:"password_hash"`
+	Provider     Provider         `json:"provider"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
+	Phone        pgtype.Text      `json:"phone"`
 }
