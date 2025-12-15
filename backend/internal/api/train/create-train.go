@@ -1,6 +1,7 @@
 package train
 
 import (
+	"better-uptime/common/middleware"
 	"better-uptime/common/util"
 	db "better-uptime/internal/db/sqlc"
 	"encoding/json"
@@ -19,6 +20,7 @@ type CreateTrainRequest struct {
 	ArrivalTime time.Time `json:"arrival_time"`
 }
 
+
 type CreateTrainResponse struct {
 	Train         db.Train         `json:"train"`
 	TrainSchedule db.Trainschedule `json:"train_schedule"`
@@ -27,15 +29,15 @@ type CreateTrainResponse struct {
 func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	// _, err := middleware.GetFirebasePayloadFromContext(ctx)
-	// if err != nil {
-	// 	util.ErrorJson(w, util.ErrUnauthorized)
-	// 	return
-	// }
+	_, err := middleware.GetFirebasePayloadFromContext(ctx)
+	if err != nil {
+		util.ErrorJson(w, util.ErrUnauthorized)
+		return
+	}
 
 	var data CreateTrainRequest
 
-	err := json.NewDecoder(r.Body).Decode(&data)
+	err = json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
@@ -54,6 +56,10 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 		Source:      data.Source,
 		Destination: data.Destination,
 	})
+	if err != nil {
+		util.ErrorJson(w, err)
+		return
+	}
 
 	trainSchedule, err := h.store.CreateTrainSchedule(ctx, db.CreateTrainScheduleParams{
 		Trainid:       pgtype.Int4{Int32: train.ID, Valid: true},
@@ -61,6 +67,10 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 		Arrivaltime:   arrivalGoTime,
 		Departuretime: departureTime,
 	})
+	if err != nil {
+		util.ErrorJson(w, err)
+		return
+	}
 
 	result := CreateTrainResponse{
 		Train:         train,

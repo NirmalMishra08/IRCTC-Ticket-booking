@@ -48,6 +48,7 @@ func NewServer(store db.Store, cfg *config.Config, rdb redis.Client) *Server {
 	// Initialize the auth handler with only required dependencies
 	server.authHandler = auth.NewHandler(cfg, store)
 	server.bookingHandler = booking.NewHandler(cfg,store,rdb)
+	server.trainHandler = train.NewHandler(cfg,store)
 
 	// You can now mount auth routes here like:
 	// r.Post("/login", server.authHandler.Login)
