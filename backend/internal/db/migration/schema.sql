@@ -83,8 +83,7 @@ CREATE TABLE seat (
     id SERIAL PRIMARY KEY,
     coachId  INTEGER REFERENCES coach(id) ON DELETE CASCADE,
     seatno INTEGER NOT NULL,
-    berth  berth_type NOT NULL,
-    CONSTRAINT unique_seat_in_coach UNIQUE (coachId, seatno)
+    berth  berth_type NOT NULL
 );
 
 CREATE Table payment (

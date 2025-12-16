@@ -47,7 +47,7 @@ func TokenMiddleware(store db.Store) func(http.Handler) http.Handler {
 					Email:  "test@example.com",
 					UID:    "0b927d97-782a-4c82-b9d2-e4e06774ed37",
 					UserId: uuid.MustParse("0b927d97-782a-4c82-b9d2-e4e06774ed37"),
-					Role:   "tester",
+					Role:   "ADMIN",
 				}
 				logrus.Info("Frontend bypass: using test user payload")
 				ctx = context.WithValue(ctx, TokenPayloadKey, payload)

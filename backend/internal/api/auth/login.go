@@ -35,7 +35,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	// For frontend testing bypass
 	if idToken == "frontend" {
 		payload = firebase.FirebasePayload{
-			Email:    "test@example.com",
+			Email:    "admin@example.com",
 			UserId:   uuid.MustParse("0b927d97-782a-4c82-b9d2-e4e06774ed37"),
 			UID:      "0b927d97-782a-4c82-b9d2-e4e06774ed37",
 			Phone:    "9876543210",
@@ -48,7 +48,6 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	var req authRequest
 	if err := util.ReadJsonAndValidate(w, r, &req); err != nil {
 		util.ErrorJson(w, err)

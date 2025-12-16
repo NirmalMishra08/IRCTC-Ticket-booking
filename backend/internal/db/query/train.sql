@@ -33,6 +33,11 @@ FROM seat s
 JOIN coach c ON s.coachId = c.id
 WHERE c.trainId = $1;
 
+-- name: GetAllTrain :many
+SELECT t.* , ts.*
+FROM train t
+JOIN trainSchedule ts ON t.id = ts.trainid;
+
 -- name: GetAvailableSeats :many
 CREATE OR REPLACE FUNCTION get_avaliable_seats(
     p_train_id INTEGER,
