@@ -31,4 +31,33 @@ JOIN bookingItem bi
 ON b.id = bi.bookingId
 WHERE b.userId = $1;
 
--- name: GetSeatsByTrainId :many
+-- name: GetActiveBookingByUser :one
+SELECT *
+FROM booking
+WHERE userid = $1
+  AND status = 'PENDING'
+  AND createdat > now() - INTERVAL '10 minutes'
+LIMIT 1;
+
+-- name: ExpireOldBooking :exec
+UPDATE booking
+SET status='EXPIRED'
+ WHERE status='PENDING'
+   AND createdat > now() - INTERVAL '10 minutes';
+
+
+-- name: GetBookingItemsByBooking :many
+SELECT seatId FROM bookingItem WHERE bookingId = $1;
+
+
+-- name: DeleteBookingItemsByBooking :exec
+DELETE FROM bookingItem WHERE bookingId = $1;
+
+
+-- name: CountActiveBookingByTrain :one
+SELECT COUNT(*)
+FROM booking
+WHERE trainId = $1
+     AND travelDate = $2
+     AND status = 'PENDING';
+
