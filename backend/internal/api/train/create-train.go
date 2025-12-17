@@ -29,8 +29,14 @@ type CreateTrainResponse struct {
 func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	_, err := middleware.GetFirebasePayloadFromContext(ctx)
+	payload, err := middleware.GetFirebasePayloadFromContext(ctx)
 	if err != nil {
+		util.ErrorJson(w, util.ErrUnauthorized)
+		return
+	}
+
+	role:= payload.Role
+	if role != "ADMIN" {
 		util.ErrorJson(w, util.ErrUnauthorized)
 		return
 	}

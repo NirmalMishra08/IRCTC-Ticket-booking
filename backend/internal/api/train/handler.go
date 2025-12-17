@@ -1,6 +1,7 @@
 package train
 
 import (
+	"better-uptime/common/middleware"
 	"better-uptime/common/routes"
 	"better-uptime/config"
 	db "better-uptime/internal/db/sqlc"
@@ -23,13 +24,14 @@ func NewHandler(config *config.Config, store db.Store) *Handler {
 func (h *Handler) Routes() *chi.Mux {
 	router := routes.DefaultRouter()
 	// without middleware
-	router.Post("/create-train",h.CreateTrain)
 
-	// router.Group(func(r chi.Router) {
-	// 	r.Use(middleware.TokenMiddleware(h.store))
-	// 	// with middleware
+	router.Group(func(r chi.Router) {
+		r.Use(middleware.TokenMiddleware(h.store))
+		r.Get("/all-train", h.GetAllTrain)
+		r.Post("/create-train", h.CreateTrain)
+		r.Post("/coach-seat", h.CreateCoachesAndSeats)
 
-	// })
+	})
 
 	return router
 }

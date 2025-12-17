@@ -20,6 +20,7 @@ type Querier interface {
 	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)
+	GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error)
 	GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow, error)
 	GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error)
 	GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error)

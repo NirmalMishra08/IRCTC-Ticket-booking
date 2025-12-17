@@ -118,10 +118,60 @@ func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainSchedu
 	return i, err
 }
 
+const getAllTrain = `-- name: GetAllTrain :many
+SELECT t.id, t.trainnumber, t.trainname, t.source, t.destination , ts.id, ts.trainid, ts.day, ts.arrivaltime, ts.departuretime
+FROM train t
+JOIN trainSchedule ts ON t.id = ts.trainid
+`
+
+type GetAllTrainRow struct {
+	ID            int32       `json:"id"`
+	Trainnumber   int32       `json:"trainnumber"`
+	Trainname     string      `json:"trainname"`
+	Source        string      `json:"source"`
+	Destination   string      `json:"destination"`
+	ID_2          int32       `json:"id_2"`
+	Trainid       pgtype.Int4 `json:"trainid"`
+	Day           DayOfWeek   `json:"day"`
+	Arrivaltime   time.Time   `json:"arrivaltime"`
+	Departuretime time.Time   `json:"departuretime"`
+}
+
+func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
+	rows, err := q.db.Query(ctx, getAllTrain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllTrainRow{}
+	for rows.Next() {
+		var i GetAllTrainRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Trainnumber,
+			&i.Trainname,
+			&i.Source,
+			&i.Destination,
+			&i.ID_2,
+			&i.Trainid,
+			&i.Day,
+			&i.Arrivaltime,
+			&i.Departuretime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAvailableSeats = `-- name: GetAvailableSeats :many
-CREATE OR REPLACE FUNCTION get_avaliable_seats(
+CREATE OR REPLACE FUNCTION get_available_seats(
     p_train_id INTEGER,
-    p_travel_day TIME
+    p_travel_date DATE  -- Changed from TIME to DATE to match your schema
 )
 RETURNS TABLE (
     coach_type TEXT,
@@ -133,24 +183,24 @@ LANGUAGE plpgsql
 AS $$ 
 BEGIN 
     RETURN QUERY 
-    SELECT c.coach_type ,
-           count(s.id) ::BIGINT as total_seats
-           count(bi.seatId) :: BIGINT as booked_seats
-          (count(s.id)- count(bi.seatId)) :: BIGINT as available_seats
+    SELECT c.coach_type,
+           COUNT(s.id)::BIGINT as total_seats,
+           COUNT(bi.seat_id)::BIGINT as booked_seats,
+           (COUNT(s.id) - COUNT(bi.seat_id))::BIGINT as available_seats
     FROM train t 
-    JOIN coach c on t.id = c.trainId
-    JOIN seat s on  c.id = s.coachId
+    JOIN coach c ON t.id = c.trainId
+    JOIN seat s ON c.id = s.coachId
     LEFT JOIN (
-        SELECT DISTINCT bi.seatId
+        SELECT DISTINCT bi.seat_id
         FROM booking b
         JOIN bookingItem bi ON b.id = bi.bookingId
         WHERE b.trainId = p_train_id
           AND b.travelDate = p_travel_date
           AND b.status IN ('CONFIRMED', 'PENDING')
-    ) bi ON s.id = bi.seatId
+    ) bi ON s.id = bi.seat_id
     WHERE t.id = p_train_id
-    GROUP BY c.coachtype
-    ORDER BY c.coachtype;
+    GROUP BY c.coach_type
+    ORDER BY c.coach_type;
 END;
 $$
 `
