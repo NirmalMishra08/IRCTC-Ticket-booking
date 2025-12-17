@@ -169,9 +169,9 @@ func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
 }
 
 const getAvailableSeats = `-- name: GetAvailableSeats :many
-CREATE OR REPLACE FUNCTION get_avaliable_seats(
+CREATE OR REPLACE FUNCTION get_available_seats(
     p_train_id INTEGER,
-    p_travel_day TIME
+    p_travel_date DATE  -- Changed from TIME to DATE to match your schema
 )
 RETURNS TABLE (
     coach_type TEXT,
@@ -183,24 +183,24 @@ LANGUAGE plpgsql
 AS $$ 
 BEGIN 
     RETURN QUERY 
-    SELECT c.coach_type ,
-           count(s.id) ::BIGINT as total_seats
-           count(bi.seatId) :: BIGINT as booked_seats
-          (count(s.id)- count(bi.seatId)) :: BIGINT as available_seats
+    SELECT c.coach_type,
+           COUNT(s.id)::BIGINT as total_seats,
+           COUNT(bi.seat_id)::BIGINT as booked_seats,
+           (COUNT(s.id) - COUNT(bi.seat_id))::BIGINT as available_seats
     FROM train t 
-    JOIN coach c on t.id = c.trainId
-    JOIN seat s on  c.id = s.coachId
+    JOIN coach c ON t.id = c.trainId
+    JOIN seat s ON c.id = s.coachId
     LEFT JOIN (
-        SELECT DISTINCT bi.seatId
+        SELECT DISTINCT bi.seat_id
         FROM booking b
         JOIN bookingItem bi ON b.id = bi.bookingId
         WHERE b.trainId = p_train_id
           AND b.travelDate = p_travel_date
           AND b.status IN ('CONFIRMED', 'PENDING')
-    ) bi ON s.id = bi.seatId
+    ) bi ON s.id = bi.seat_id
     WHERE t.id = p_train_id
-    GROUP BY c.coachtype
-    ORDER BY c.coachtype;
+    GROUP BY c.coach_type
+    ORDER BY c.coach_type;
 END;
 $$
 `

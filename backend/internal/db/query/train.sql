@@ -38,13 +38,15 @@ SELECT t.* , ts.*
 FROM train t
 JOIN trainSchedule ts ON t.id = ts.trainid;
 
+
+
 -- name: GetAvailableSeats :many
-CREATE OR REPLACE FUNCTION get_available_seats(
+CREATE  OR REPLACE FUNCTION get_available_seats(
     p_train_id INTEGER,
-    p_travel_day TIME
+    p_travel_date DATE  -- Changed from TIME to DATE to match your schema
 )
 RETURNS TABLE (
-    coach_type TEXT,
+    coach_type coach_type,
     total_seats BIGINT,
     booked_seats BIGINT,
     available_seats BIGINT
@@ -53,13 +55,13 @@ LANGUAGE plpgsql
 AS $$ 
 BEGIN 
     RETURN QUERY 
-    SELECT c.coach_type ,
-           count(s.id) ::BIGINT as total_seats
-           count(bi.seatId) :: BIGINT as booked_seats
-          (count(s.id)- count(bi.seatId)) :: BIGINT as available_seats
+    SELECT c.coachtype,
+           COUNT(s.id)::BIGINT as total_seats,
+           COUNT(bi.seatId)::BIGINT as booked_seats,
+           (COUNT(s.id) - COUNT(bi.seatId))::BIGINT as available_seats
     FROM train t 
-    JOIN coach c on t.id = c.trainId
-    JOIN seat s on  c.id = s.coachId
+    JOIN coach c ON t.id = c.trainId
+    JOIN seat s ON c.id = s.coachId
     LEFT JOIN (
         SELECT DISTINCT bi.seatId
         FROM booking b
