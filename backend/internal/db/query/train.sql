@@ -39,7 +39,7 @@ FROM train t
 JOIN trainSchedule ts ON t.id = ts.trainid;
 
 -- name: GetAvailableSeats :many
-CREATE OR REPLACE FUNCTION get_avaliable_seats(
+CREATE OR REPLACE FUNCTION get_available_seats(
     p_train_id INTEGER,
     p_travel_day TIME
 )
