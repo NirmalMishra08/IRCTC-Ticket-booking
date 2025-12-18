@@ -23,6 +23,8 @@ func main() {
 
 	rdb:= redis.RedisConnect(cfg.REDIS_DB_URL, cfg.REDIS_PASSWORD)
 
+	defer rdb.Close()
+
 	// Connect to DB
 	pool, err := pgxpool.New(context.Background(), cfg.POSTGRES_CONNECTION)
 	if err != nil {

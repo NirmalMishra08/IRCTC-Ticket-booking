@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	CountActiveBookingByTrain(ctx context.Context, arg CountActiveBookingByTrainParams) (int64, error)
 	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
@@ -19,12 +20,16 @@ type Querier interface {
 	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
 	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) error
+	ExpireOldBooking(ctx context.Context) error
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)
+	GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID) (Booking, error)
 	GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error)
 	GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow, error)
 	GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error)
 	GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error)
 	GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error)
+	GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
@@ -35,6 +40,9 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
+	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
+	ValidateTrain(ctx context.Context, id int32) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)
