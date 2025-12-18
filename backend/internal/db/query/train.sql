@@ -78,6 +78,25 @@ $$;
 
 -- name: GetAvailableSeatsExecute :many
 SELECT * FROM get_available_seats($1, $2);
+
+-- name: ValidateTrain :one
+SELECT COUNT(*)
+FROM train WHERE id = $1;
+
+-- name: ValidateSchedule :one
+SELECT count(*)
+FROM trainSchedule ts
+WHERE ts.trainId = $1 
+AND DATE(ts.arrivaltime) = $2::DATE;
+
+-- name: ValidateSeatsBelongToTrain :one
+SELECT COUNT(*) = $1::int as all_seat_belong,
+ count(*)::int as seat_found,
+ $1 - COUNT(*) as seats_not_found
+ FROM seat s 
+ JOIN coach c on s.coachId = c.id
+ WHERE s.id = ANY($2::int[])
+  AND c.trainId = $3;
         
 
 
