@@ -169,12 +169,12 @@ func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
 }
 
 const getAvailableSeats = `-- name: GetAvailableSeats :many
-CREATE OR REPLACE FUNCTION get_available_seats(
+CREATE  OR REPLACE FUNCTION get_available_seats(
     p_train_id INTEGER,
     p_travel_date DATE  -- Changed from TIME to DATE to match your schema
 )
 RETURNS TABLE (
-    coach_type TEXT,
+    coach_type coach_type,
     total_seats BIGINT,
     booked_seats BIGINT,
     available_seats BIGINT
@@ -183,24 +183,24 @@ LANGUAGE plpgsql
 AS $$ 
 BEGIN 
     RETURN QUERY 
-    SELECT c.coach_type,
+    SELECT c.coachtype,
            COUNT(s.id)::BIGINT as total_seats,
-           COUNT(bi.seat_id)::BIGINT as booked_seats,
-           (COUNT(s.id) - COUNT(bi.seat_id))::BIGINT as available_seats
+           COUNT(bi.seatId)::BIGINT as booked_seats,
+           (COUNT(s.id) - COUNT(bi.seatId))::BIGINT as available_seats
     FROM train t 
     JOIN coach c ON t.id = c.trainId
     JOIN seat s ON c.id = s.coachId
     LEFT JOIN (
-        SELECT DISTINCT bi.seat_id
+        SELECT DISTINCT bi.seatId
         FROM booking b
         JOIN bookingItem bi ON b.id = bi.bookingId
         WHERE b.trainId = p_train_id
           AND b.travelDate = p_travel_date
           AND b.status IN ('CONFIRMED', 'PENDING')
-    ) bi ON s.id = bi.seat_id
+    ) bi ON s.id = bi.seatId
     WHERE t.id = p_train_id
-    GROUP BY c.coach_type
-    ORDER BY c.coach_type;
+    GROUP BY c.coachtype
+    ORDER BY c.coachtype;
 END;
 $$
 `
@@ -389,4 +389,64 @@ func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainSchedul
 		&i.Departuretime,
 	)
 	return i, err
+}
+
+const validateSchedule = `-- name: ValidateSchedule :one
+SELECT count(*)
+FROM trainSchedule ts
+WHERE ts.trainId = $1 
+AND DATE(ts.arrivaltime) = $2::DATE
+`
+
+type ValidateScheduleParams struct {
+	Trainid pgtype.Int4 `json:"trainid"`
+	Column2 pgtype.Date `json:"column_2"`
+}
+
+func (q *Queries) ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, validateSchedule, arg.Trainid, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const validateSeatsBelongToTrain = `-- name: ValidateSeatsBelongToTrain :one
+SELECT COUNT(*) = $1::int as all_seat_belong,
+ count(*)::int as seat_found,
+ $1 - COUNT(*) as seats_not_found
+ FROM seat s 
+ JOIN coach c on s.coachId = c.id
+ WHERE s.id = ANY($2::int[])
+  AND c.trainId = $3
+`
+
+type ValidateSeatsBelongToTrainParams struct {
+	Column1 int32       `json:"column_1"`
+	Column2 []int32     `json:"column_2"`
+	Trainid pgtype.Int4 `json:"trainid"`
+}
+
+type ValidateSeatsBelongToTrainRow struct {
+	AllSeatBelong bool  `json:"all_seat_belong"`
+	SeatFound     int32 `json:"seat_found"`
+	SeatsNotFound int   `json:"seats_not_found"`
+}
+
+func (q *Queries) ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error) {
+	row := q.db.QueryRow(ctx, validateSeatsBelongToTrain, arg.Column1, arg.Column2, arg.Trainid)
+	var i ValidateSeatsBelongToTrainRow
+	err := row.Scan(&i.AllSeatBelong, &i.SeatFound, &i.SeatsNotFound)
+	return i, err
+}
+
+const validateTrain = `-- name: ValidateTrain :one
+SELECT COUNT(*)
+FROM train WHERE id = $1
+`
+
+func (q *Queries) ValidateTrain(ctx context.Context, id int32) (int64, error) {
+	row := q.db.QueryRow(ctx, validateTrain, id)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }

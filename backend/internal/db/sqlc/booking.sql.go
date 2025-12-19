@@ -11,6 +11,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveBookingByTrain = `-- name: CountActiveBookingByTrain :one
+SELECT COUNT(*)
+FROM booking
+WHERE trainId = $1
+     AND travelDate = $2
+     AND status = 'PENDING'
+`
+
+type CountActiveBookingByTrainParams struct {
+	Trainid    pgtype.Int4 `json:"trainid"`
+	Traveldate pgtype.Date `json:"traveldate"`
+}
+
+func (q *Queries) CountActiveBookingByTrain(ctx context.Context, arg CountActiveBookingByTrainParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveBookingByTrain, arg.Trainid, arg.Traveldate)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBooking = `-- name: CreateBooking :one
 INSERT INTO booking (userId, trainId, travelDate, status, holdToken)
 VALUES ($1, $2, $3, 'PENDING', $4)
@@ -69,6 +89,52 @@ func (q *Queries) CreateBookingItem(ctx context.Context, arg CreateBookingItemPa
 	return i, err
 }
 
+const deleteBookingItemsByBooking = `-- name: DeleteBookingItemsByBooking :exec
+DELETE FROM bookingItem WHERE bookingId = $1
+`
+
+func (q *Queries) DeleteBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteBookingItemsByBooking, bookingid)
+	return err
+}
+
+const expireOldBooking = `-- name: ExpireOldBooking :exec
+UPDATE booking
+SET status='EXPIRED'
+ WHERE status='PENDING'
+   AND createdat > now() - INTERVAL '10 minutes'
+`
+
+func (q *Queries) ExpireOldBooking(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, expireOldBooking)
+	return err
+}
+
+const getActiveBookingByUser = `-- name: GetActiveBookingByUser :one
+SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat
+FROM booking
+WHERE userid = $1
+  AND status = 'PENDING'
+  AND createdat > now() - INTERVAL '10 minutes'
+LIMIT 1
+`
+
+func (q *Queries) GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID) (Booking, error) {
+	row := q.db.QueryRow(ctx, getActiveBookingByUser, userid)
+	var i Booking
+	err := row.Scan(
+		&i.ID,
+		&i.Userid,
+		&i.Trainid,
+		&i.Traveldate,
+		&i.Status,
+		&i.Holdtoken,
+		&i.Paymentid,
+		&i.Createdat,
+	)
+	return i, err
+}
+
 const getBookedSeats = `-- name: GetBookedSeats :many
 SELECT bi.seatId
 FROM bookingItem bi
@@ -121,6 +187,30 @@ func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Te
 		&i.Createdat,
 	)
 	return i, err
+}
+
+const getBookingItemsByBooking = `-- name: GetBookingItemsByBooking :many
+SELECT seatId FROM bookingItem WHERE bookingId = $1
+`
+
+func (q *Queries) GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error) {
+	rows, err := q.db.Query(ctx, getBookingItemsByBooking, bookingid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.Int4{}
+	for rows.Next() {
+		var seatid pgtype.Int4
+		if err := rows.Scan(&seatid); err != nil {
+			return nil, err
+		}
+		items = append(items, seatid)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getBookingbyUserId = `-- name: GetBookingbyUserId :many

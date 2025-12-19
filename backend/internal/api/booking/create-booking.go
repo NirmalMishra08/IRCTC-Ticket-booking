@@ -3,8 +3,13 @@ package booking
 import (
 	"better-uptime/common/middleware"
 	"better-uptime/common/util"
+	db "better-uptime/internal/db/sqlc"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type SeatRequest struct {
@@ -47,6 +52,100 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, util.ErrUnauthorized)
 		return
 	}
-	userId := payload.UserId
+
+	var data bookingRequest
+
+	err = util.ReadJsonAndValidate(w, r, &data)
+	if err != nil {
+		util.ErrorJson(w, util.ErrNotValidRequest)
+		return
+	}
+
+	err = h.store.ExpireOldBooking(ctx)
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
+
+	booking, err := h.store.GetActiveBookingByUser(ctx, pgtype.UUID{Bytes: payload.UserId, Valid: true})
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
+
+	if booking.ID != 0 {
+		util.ErrorJson(w, fmt.Errorf("you already have an acting booking"))
+		return
+	}
+
+	count, err := h.store.ValidateTrain(ctx, int32(data.TrainId))
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
+	if count == 0 {
+		util.ErrorJson(w, fmt.Errorf("no such train exists"))
+		return
+	}
+
+	travelDate, err := time.Parse("2006-01-02", data.TravelDate)
+	if err != nil {
+		util.ErrorJson(w, util.ErrNotValidRequest)
+		return
+	}
+
+	trainScheduleCount, err := h.store.ValidateSchedule(ctx, db.ValidateScheduleParams{
+		Trainid: util.ToPgInt4(int32(data.TrainId)),
+		Column2: pgtype.Date{Time: travelDate},
+	})
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
+	if trainScheduleCount == 0 {
+		util.ErrorJson(w, fmt.Errorf("no such train  schedule exists"))
+		return
+	}
+
+	seatLength := len(data.Seats)
+
+	var seatIDs []int32
+
+	seatIDs, err = ValidateSeatId(data.Seats)
+	if err != nil {
+
+	}
+
+	seatCount, err := h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
+		Column1: int32(seatLength),
+		Column2: seatIDs,
+	})
+
+}
+
+func ValidateSeatId(Seats []SeatRequest) ([]int32, error) {
+
+	if len(Seats) == 0 {
+		return nil, errors.New("no seats selected")
+	}
+
+	var Seatids []int32
+
+	seen := make(map[int32]bool)
+
+	for index, seat := range Seats {
+           if seat.SeatId <= 0{
+			return nil ,errors.New("invalid seat")
+		   }
+		
+		   if seen[int32(seat.SeatId)]{
+			return nil ,errors.New("duplicate seat")
+		   }
+
+		   seen[int32(seat.SeatId)] = true
+
+		   Seatids = append(Seatids,int32(seat.SeatId))
+	}
+
 
 }

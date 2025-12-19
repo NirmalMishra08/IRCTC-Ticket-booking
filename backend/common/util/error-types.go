@@ -26,7 +26,7 @@ var (
 	ErrExpiredToken          = errors.New("expired token")
 	ErrInvalidToken          = errors.New("invalid token")
 	ErrInvalidOtp            = errors.New("invalid otp")
-	ErrInternal              = errors.New("internal error")
+	ErrInternal              = errors.New("internal server error")
 	ErrTokenMissing          = errors.New("token missing")
 	ErrContextMissing        = errors.New("context missing")
 	ErrUnauthorized          = errors.New("unauthorized")
