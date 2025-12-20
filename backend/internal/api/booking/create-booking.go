@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -113,14 +114,31 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	seatIDs, err = ValidateSeatId(data.Seats)
 	if err != nil {
-
+      util.ErrorJson(w , fmt.Errorf("not able to validate seats"))
 	}
 
-	seatCount, err := h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
+	_, err = h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
 		Column1: int32(seatLength),
 		Column2: seatIDs,
 	})
 
+	availableSeats, err := h.store.CurrentAvailabeSeats(ctx,db.CurrentAvailabeSeatsParams{
+		Column1: seatIDs,
+		Trainid: pgtype.Int4{Int32: int32(data.TrainId)},
+		Traveldate: pgtype.Date{Time: travelDate,Valid: true},
+	})
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
+
+	if slices.Equal(availableSeats,seatIDs){
+		util.ErrorJson(w, fmt.Errorf("not all requested seats are available"))
+		return
+	}
+
+
+	
 }
 
 func ValidateSeatId(Seats []SeatRequest) ([]int32, error) {
@@ -133,19 +151,20 @@ func ValidateSeatId(Seats []SeatRequest) ([]int32, error) {
 
 	seen := make(map[int32]bool)
 
-	for index, seat := range Seats {
-           if seat.SeatId <= 0{
-			return nil ,errors.New("invalid seat")
-		   }
-		
-		   if seen[int32(seat.SeatId)]{
-			return nil ,errors.New("duplicate seat")
-		   }
+	for _, seat := range Seats {
+		if seat.SeatId <= 0 {
+			return nil, errors.New("invalid seat")
+		}
 
-		   seen[int32(seat.SeatId)] = true
+		if seen[int32(seat.SeatId)] {
+			return nil, errors.New("duplicate seat")
+		}
 
-		   Seatids = append(Seatids,int32(seat.SeatId))
+		seen[int32(seat.SeatId)] = true
+
+		Seatids = append(Seatids, int32(seat.SeatId))
 	}
 
+	return Seatids , nil
 
 }
