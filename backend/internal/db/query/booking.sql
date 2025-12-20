@@ -61,3 +61,18 @@ WHERE trainId = $1
      AND travelDate = $2
      AND status = 'PENDING';
 
+-- name: CurrentAvailabeSeats :many
+SELECT s.id
+FROM seat s WHERE
+seat.id = $1 :: int[]
+ AND NOT EXISTS (
+   SELECT 1 FROM
+   bookingItem bi
+   JOIN booking b ON bi.bookingId = b.id
+   WHERE bi.seatId = s.id
+   AND b.status  IN('PENDING','CONFIRMED')
+   AND b.trainId = $2
+   AND b.travelDate = $3
+ );
+
+
