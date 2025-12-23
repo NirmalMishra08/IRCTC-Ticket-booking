@@ -89,6 +89,47 @@ func (q *Queries) CreateBookingItem(ctx context.Context, arg CreateBookingItemPa
 	return i, err
 }
 
+const currentAvailabeSeats = `-- name: CurrentAvailabeSeats :many
+SELECT s.id
+FROM seat s WHERE
+seat.id = $1 :: int[]
+ AND NOT EXISTS (
+   SELECT 1 FROM
+   bookingItem bi
+   JOIN booking b ON bi.bookingId = b.id
+   WHERE bi.seatId = s.id
+   AND b.status  IN('PENDING','CONFIRMED')
+   AND b.trainId = $2
+   AND b.travelDate = $3
+ )
+`
+
+type CurrentAvailabeSeatsParams struct {
+	Column1    []int32     `json:"column_1"`
+	Trainid    pgtype.Int4 `json:"trainid"`
+	Traveldate pgtype.Date `json:"traveldate"`
+}
+
+func (q *Queries) CurrentAvailabeSeats(ctx context.Context, arg CurrentAvailabeSeatsParams) ([]int32, error) {
+	rows, err := q.db.Query(ctx, currentAvailabeSeats, arg.Column1, arg.Trainid, arg.Traveldate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var id int32
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteBookingItemsByBooking = `-- name: DeleteBookingItemsByBooking :exec
 DELETE FROM bookingItem WHERE bookingId = $1
 `
