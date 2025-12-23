@@ -64,7 +64,7 @@ WHERE trainId = $1
 -- name: CurrentAvailabeSeats :many
 SELECT s.id
 FROM seat s WHERE
-seat.id = $1 :: int[]
+seat.id = ANY($1 :: int[])
  AND NOT EXISTS (
    SELECT 1 FROM
    bookingItem bi
