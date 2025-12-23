@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -61,13 +62,13 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
 	}
-
+	// expire all the old bookings who are pending or cancelled
 	err = h.store.ExpireOldBooking(ctx)
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
 		return
 	}
-
+	// check if the user have some active bookings
 	booking, err := h.store.GetActiveBookingByUser(ctx, pgtype.UUID{Bytes: payload.UserId, Valid: true})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
@@ -78,7 +79,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, fmt.Errorf("you already have an acting booking"))
 		return
 	}
-
+	// check whether that train exists
 	count, err := h.store.ValidateTrain(ctx, int32(data.TrainId))
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
@@ -88,13 +89,13 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, fmt.Errorf("no such train exists"))
 		return
 	}
-
+	// parse the travelDate from request into time.Time
 	travelDate, err := time.Parse("2006-01-02", data.TravelDate)
 	if err != nil {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
 	}
-
+	// check whether that train on that scheedule exists
 	trainScheduleCount, err := h.store.ValidateSchedule(ctx, db.ValidateScheduleParams{
 		Trainid: util.ToPgInt4(int32(data.TrainId)),
 		Column2: pgtype.Date{Time: travelDate},
@@ -114,31 +115,36 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	seatIDs, err = ValidateSeatId(data.Seats)
 	if err != nil {
-      util.ErrorJson(w , fmt.Errorf("not able to validate seats"))
+		util.ErrorJson(w, fmt.Errorf("not able to validate seats"))
 	}
 
 	_, err = h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
 		Column1: int32(seatLength),
 		Column2: seatIDs,
 	})
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("seat does not belong to that train"))
+	}
 
-	availableSeats, err := h.store.CurrentAvailabeSeats(ctx,db.CurrentAvailabeSeatsParams{
-		Column1: seatIDs,
-		Trainid: pgtype.Int4{Int32: int32(data.TrainId)},
-		Traveldate: pgtype.Date{Time: travelDate,Valid: true},
+	// get all the available seats from that train
+	availableSeats, err := h.store.CurrentAvailabeSeats(ctx, db.CurrentAvailabeSeatsParams{
+		Column1:    seatIDs,
+		Trainid:    pgtype.Int4{Int32: int32(data.TrainId)},
+		Traveldate: pgtype.Date{Time: travelDate, Valid: true},
 	})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
 		return
 	}
-
-	if slices.Equal(availableSeats,seatIDs){
+	// compare all the available setas with the users'requested seats
+	if slices.Equal(availableSeats, seatIDs) {
 		util.ErrorJson(w, fmt.Errorf("not all requested seats are available"))
 		return
 	}
 
-
+	holdToken := uuid.New().String()
 	
+
 }
 
 func ValidateSeatId(Seats []SeatRequest) ([]int32, error) {
@@ -165,6 +171,6 @@ func ValidateSeatId(Seats []SeatRequest) ([]int32, error) {
 		Seatids = append(Seatids, int32(seat.SeatId))
 	}
 
-	return Seatids , nil
+	return Seatids, nil
 
 }
