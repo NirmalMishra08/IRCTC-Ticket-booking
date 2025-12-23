@@ -41,7 +41,7 @@ func (h *Handler) ReleaseLocks(ctx context.Context, trainId, travelDate string, 
 
 	for _, seatId := range seatIds {
 		key := fmt.Sprintf("seats:%s:%s:%s", trainId, travelDate, seatId)
-		getCmd := h.Redis.Get(ctx, key)
+		getCmd := pipe.Get(ctx, key)
 		log.Print(getCmd)
 	}
 
@@ -72,4 +72,19 @@ func (h *Handler) ReleaseLocks(ctx context.Context, trainId, travelDate string, 
 	}
 
 	return nil
+}
+
+func (h *Handler) CheckLock(ctx context.Context, trainId, travelDate string, seatId string, holdToken string) (bool, error) {
+	key := fmt.Sprintf("seats:%s:%s:%s", trainId, travelDate, seatId)
+
+	val, err := h.Redis.Get(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	if err == redis.Nil {
+		// no seat lock for this seat
+		return false, nil
+	}
+
+	return holdToken == val, nil
 }
