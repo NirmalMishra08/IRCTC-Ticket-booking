@@ -116,7 +116,6 @@ func (h *Handler) ValidateSeatLocks(ctx context.Context, trainId, travelDate str
 	return true, nil
 }
 
-
 // extend the pipeline by ttl time
 func (h *Handler) ExtendSeatLocksTTL(ctx context.Context, trainId, travelDate string, seatIds []string, ttl time.Duration) (bool, error) {
 	pipe := h.Redis.Pipeline()
@@ -141,12 +140,38 @@ func (h *Handler) ExtendSeatLocksTTL(ctx context.Context, trainId, travelDate st
 
 	extendPipe := h.Redis.Pipeline()
 
-	for i , seatId := range seatIds{
+	for _, seatId := range seatIds {
 		key := fmt.Sprintf("seats:%s:%s:%s", trainId, travelDate, seatId)
-		extendPipe.Expire(ctx , key , ttl)
+		extendPipe.Expire(ctx, key, ttl)
 	}
 
 	_, err = extendPipe.Exec(ctx)
 
-	return err == nil , err
+	return err == nil, err
+}
+
+func (h *Handler) AreSeatsTemporarilyLocked(ctx context.Context, trainId, travelDate string, seatIds []string) (map[string]bool, error) {
+	pipe := h.Redis.Pipeline()
+	cmds := make(map[string]*redis.StringCmd)
+
+	for _, seatId := range seatIds {
+		key := fmt.Sprintf("seats:%s:%s:%s", trainId, travelDate, seatId)
+		cmds[seatId] = pipe.Get(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+
+	for seatId, cmd := range cmds {
+		_, err := cmd.Result()
+
+		result[seatId] = (err != redis.Nil)
+	}
+
+	return result, nil
+
 }
