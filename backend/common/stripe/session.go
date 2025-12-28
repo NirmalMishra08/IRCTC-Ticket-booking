@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/stripe/stripe-go/v84"
@@ -43,7 +44,7 @@ func ConvertTheAmount(price string, currency string) (int64, error) {
 
 }
 
-func StripeSession(ctx context.Context, userUUID, price, planName, StripeKey string) (*APIResponse, error) {
+func StripeSession(ctx context.Context, userUUID, price, planName, StripeKey string, bookingId int, holdToken string) (*APIResponse, error) {
 	convertedAmount, err := ConvertTheAmount(price, "usd")
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert the amount %w", err)
@@ -71,6 +72,10 @@ func StripeSession(ctx context.Context, userUUID, price, planName, StripeKey str
 		ExpiresAt:           stripe.Int64(time.Now().Add(30 * time.Minute).Unix()),
 		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
 			SetupFutureUsage: stripe.String("off_session"),
+			Metadata: map[string]string{
+				"bookingId": strconv.Itoa(bookingId),
+				"hold_token":holdToken,
+			},
 		},
 	}
 	params.AddMetadata("api_version", "2024-05-01")
