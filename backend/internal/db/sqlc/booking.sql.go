@@ -89,10 +89,36 @@ func (q *Queries) CreateBookingItem(ctx context.Context, arg CreateBookingItemPa
 	return i, err
 }
 
+const createPayment = `-- name: CreatePayment :one
+ INSERT into payment (bookingId,amount,transactionId)
+ VALUES($1,$2,$3)
+ RETURNING id, bookingid, amount, status, transactionid, createdat
+`
+
+type CreatePaymentParams struct {
+	Bookingid     pgtype.Int4 `json:"bookingid"`
+	Amount        float64     `json:"amount"`
+	Transactionid string      `json:"transactionid"`
+}
+
+func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, createPayment, arg.Bookingid, arg.Amount, arg.Transactionid)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.Bookingid,
+		&i.Amount,
+		&i.Status,
+		&i.Transactionid,
+		&i.Createdat,
+	)
+	return i, err
+}
+
 const currentAvailabeSeats = `-- name: CurrentAvailabeSeats :many
 SELECT s.id
 FROM seat s WHERE
-seat.id = ANY($1 :: int[])
+s.id = ANY($1 :: int[])
  AND NOT EXISTS (
    SELECT 1 FROM
    bookingItem bi

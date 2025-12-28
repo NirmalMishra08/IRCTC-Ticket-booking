@@ -19,7 +19,8 @@ INSERT into seat (coachId,seatno,berth) VALUES ($1 , $2 , $3) RETURNING *;
 
 -- name: GetTrainScheduleByDay :one
 SELECT * FROM trainSchedule
-WHERE trainId = $1 AND day = $2;
+WHERE trainId = $1 
+AND arrivalTime::DATE = $2::DATE;
 
 -- name: GetCoachesByTrain :many
 SELECT * FROM coach WHERE trainId = $1;
@@ -83,12 +84,13 @@ SELECT * FROM get_available_seats($1, $2);
 SELECT COUNT(*)
 FROM train WHERE id = $1;
 
+
 -- name: ValidateSchedule :one
 SELECT count(*)
 FROM trainSchedule ts
 WHERE ts.trainId = $1 
-AND DATE(ts.arrivaltime) = $2::DATE;
-
+AND (ts.arrivaltime AT TIME ZONE 'UTC')::date = $2::date;
+ 
 -- name: ValidateSeatsBelongToTrain :one
 SELECT COUNT(*) = $1::int as all_seat_belong,
  count(*)::int as seat_found,

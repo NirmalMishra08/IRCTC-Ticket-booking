@@ -16,6 +16,7 @@ type Querier interface {
 	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
+	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
 	CreateSeat(ctx context.Context, arg CreateSeatParams) (Seat, error)
 	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
 	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
@@ -36,7 +37,7 @@ type Querier interface {
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
-	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error)
+	GetTrainScheduleByDay(ctx context.Context, trainid pgtype.Int4) (Trainschedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error

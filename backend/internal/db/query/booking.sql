@@ -64,7 +64,7 @@ WHERE trainId = $1
 -- name: CurrentAvailabeSeats :many
 SELECT s.id
 FROM seat s WHERE
-seat.id = ANY($1 :: int[])
+s.id = ANY($1 :: int[])
  AND NOT EXISTS (
    SELECT 1 FROM
    bookingItem bi
@@ -74,5 +74,19 @@ seat.id = ANY($1 :: int[])
    AND b.trainId = $2
    AND b.travelDate = $3
  );
+
+ CREATE Table payment (
+    id  SERIAL PRIMARY KEY ,
+    bookingId  INTEGER,
+    amount   FLOAT NOT NULL,
+    status payment_status DEFAULT 'PENDING',
+    transactionId TEXT NOT NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- name: CreatePayment :one
+ INSERT into payment (bookingId,amount,transactionId)
+ VALUES($1,$2,$3)
+ RETURNING *;
 
 
