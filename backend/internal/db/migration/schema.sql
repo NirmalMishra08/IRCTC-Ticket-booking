@@ -111,9 +111,10 @@ CREATE TABLE bookingItem (
     id SERIAL PRIMARY KEY,
     bookingId  INTEGER REFERENCES booking(id) ON DELETE CASCADE,
     seatId INT REFERENCES seat(id) ON DELETE RESTRICT,
-    trainScheduleId INTEGER REFERENCES trainSchedule(id) ON DELETE RESTRICT,
-    CONSTRAINT unique_seat_booked UNIQUE (seatId, trainScheduleId)
+    bookingStatus booking_status NOT NULL DEFAULT 'PENDING',
+    trainScheduleId INTEGER REFERENCES trainSchedule(id) ON DELETE RESTRICT
 );
+
 
 -- This enforces that the payment must always reference a valid booking.
 ALTER TABLE payment
@@ -121,6 +122,11 @@ ADD CONSTRAINT fk_payment_booking
 FOREIGN KEY (bookingId) 
 REFERENCES booking(id) 
 ON DELETE RESTRICT;
+
+CREATE UNIQUE INDEX unique_confirmed_seat_per_schedule
+ON bookingItem (seatId, trainScheduleId)
+WHERE bookingStatus = 'CONFIRMED';
+
 
 
 -- indexex 

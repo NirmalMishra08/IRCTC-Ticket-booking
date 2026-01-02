@@ -370,11 +370,17 @@ func (q *Queries) GetTrainById(ctx context.Context, id int32) (Train, error) {
 
 const getTrainScheduleByDay = `-- name: GetTrainScheduleByDay :one
 SELECT id, trainid, day, arrivaltime, departuretime FROM trainSchedule
-WHERE trainId = $1
+WHERE trainId = $1 
+AND arrivalTime::DATE = $2::DATE
 `
 
-func (q *Queries) GetTrainScheduleByDay(ctx context.Context, trainid pgtype.Int4) (Trainschedule, error) {
-	row := q.db.QueryRow(ctx, getTrainScheduleByDay, trainid)
+type GetTrainScheduleByDayParams struct {
+	Trainid pgtype.Int4 `json:"trainid"`
+	Column2 pgtype.Date `json:"column_2"`
+}
+
+func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error) {
+	row := q.db.QueryRow(ctx, getTrainScheduleByDay, arg.Trainid, arg.Column2)
 	var i Trainschedule
 	err := row.Scan(
 		&i.ID,

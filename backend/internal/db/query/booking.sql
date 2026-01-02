@@ -89,4 +89,23 @@ s.id = ANY($1 :: int[])
  VALUES($1,$2,$3)
  RETURNING *;
 
+-- name: UpdateBookingItemStatus :exec
+UPDATE bookingItem SET bookingStatus = $2 WHERE bookingId = $1;
+
+-- name: UpdatePaymentStatus :exec
+UPDATE payment SET status = $2 WHERE bookingId = $1;
+
+-- name: GetBookingLockContext :many
+SELECT
+    b.trainId,
+    b.travelDate,
+    bi.seatId,
+    b.holdToken
+FROM booking b
+JOIN bookingItem bi ON bi.bookingId = b.id
+WHERE b.id = $1;
+
+
+
+
 
