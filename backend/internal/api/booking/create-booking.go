@@ -101,15 +101,15 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
 	}
-	 logger.Debug(data.TravelDate,travelDate)
+	logger.Debug(data.TravelDate, travelDate)
 	// check whether that train on that scheedule exists
 	trainScheduleCount, err := h.store.ValidateSchedule(ctx, db.ValidateScheduleParams{
 		Trainid: util.ToPgInt4(int32(data.TrainId)),
-		Column2: pgtype.Date{Time:travelDate ,Valid: true},
+		Column2: pgtype.Date{Time: travelDate, Valid: true},
 	})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--4>",err)
+		logger.Debug("here--4>", err)
 		return
 	}
 	if trainScheduleCount == 0 {
@@ -144,7 +144,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--5>",err)
+		logger.Debug("here--5>", err)
 		return
 	}
 
@@ -199,8 +199,12 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		// 	Trainid:     util.ToPgInt4(int32(data.TrainId)),
 		// 	Arrivaltime: travelDate,
 		// })
-		trainScheduled,err:= q.GetTrainScheduleByDay(ctx,util.ToPgInt4(int32(data.TrainId)))
-		logger.Debug(travelDate.String())
+
+		logger.Debug("hello --->",travelDate)
+		trainScheduled, err := q.GetTrainScheduleByDay(ctx, db.GetTrainScheduleByDayParams{
+			Trainid: util.ToPgInt4(int32(data.TrainId)),
+			Column2: pgtype.Date{Time: travelDate,Valid: true},
+		})
 		if err != nil {
 			return fmt.Errorf("get train schedule: %w", err)
 
@@ -233,7 +237,9 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	var amount int32
 	amount = CalculateFare(int32(len(seatIDs)))
 
-	paymentIntent, err := stripe.StripeSession(ctx, payload.UserId.String(), strconv.Itoa(int(amount)), "seatIds:", h.config.STRIPE_KEY, int(bookingID), holdToken)
+	logger.Debug("hello------>"+h.config.STRIPE_SECRET_KEY)
+
+	paymentIntent, err := stripe.StripeSession(ctx, payload.UserId.String(), strconv.Itoa(int(amount)), "seatIds:", h.config.STRIPE_SECRET_KEY, int(bookingID), holdToken)
 	if err != nil {
 
 		updateErr := h.store.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
