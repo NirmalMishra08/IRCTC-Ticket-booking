@@ -12,7 +12,7 @@ type Config struct {
 	POSTGRES_CONNECTION string
 	REDIS_DB_URL        string
 	REDIS_PASSWORD      string
-	STRIPE_KEY          string
+	STRIPE_SECRET_KEY   string
 }
 
 func LoadConfig() *Config {
@@ -25,7 +25,7 @@ func LoadConfig() *Config {
 		POSTGRES_CONNECTION: getEnv("POSTGRES_CONNECTION", ""),
 		REDIS_DB_URL:        getEnv("REDIS_DB_URL", ""),
 		REDIS_PASSWORD:      getEnv("REDIS_PASSWORD", ""),
-		STRIPE_KEY:          getEnv("STRIPE_KEY", ""),
+		STRIPE_SECRET_KEY:   getEnv("STRIPE_SECRET_KEY", ""),
 	}
 }
 
