@@ -32,18 +32,23 @@ type Querier interface {
 	GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error)
 	GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error)
 	GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error)
+	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
-	GetTrainScheduleByDay(ctx context.Context, trainid pgtype.Int4) (Trainschedule, error)
+	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
+	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
 	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
+	// SELECT *
+	// FROM get_available_seats(1, '2026-01-15');
 	ValidateTrain(ctx context.Context, id int32) (int64, error)
 }
 

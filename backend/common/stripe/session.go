@@ -70,12 +70,9 @@ func StripeSession(ctx context.Context, userUUID, price, planName, StripeKey str
 		SuccessURL:          stripe.String("http://127.0.0.1:5500/Stripe-Payment-Go/payment-success.html"),
 		CancelURL:           stripe.String("http://127.0.0.1:5500/Stripe-Payment-Go/payment-failed.html"),
 		ExpiresAt:           stripe.Int64(time.Now().Add(30 * time.Minute).Unix()),
-		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
-			SetupFutureUsage: stripe.String("off_session"),
-			Metadata: map[string]string{
-				"bookingId": strconv.Itoa(bookingId),
-				"hold_token":holdToken,
-			},
+		Metadata: map[string]string{
+			"booking_id": strconv.Itoa(bookingId),
+			"hold_token": holdToken,
 		},
 	}
 	params.AddMetadata("api_version", "2024-05-01")

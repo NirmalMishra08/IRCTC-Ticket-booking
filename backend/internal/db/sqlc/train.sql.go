@@ -229,19 +229,23 @@ func (q *Queries) GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow
 }
 
 const getAvailableSeatsExecute = `-- name: GetAvailableSeatsExecute :many
-SELECT  FROM get_available_seats($1, $2)
+SELECT 
+FROM get_available_seats(
+    $1::int,
+    $2::date
+)
 `
 
 type GetAvailableSeatsExecuteParams struct {
-	GetAvailableSeats   interface{} `json:"get_available_seats"`
-	GetAvailableSeats_2 interface{} `json:"get_available_seats_2"`
+	TrainID    int32       `json:"train_id"`
+	TravelDate pgtype.Date `json:"travel_date"`
 }
 
 type GetAvailableSeatsExecuteRow struct {
 }
 
 func (q *Queries) GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error) {
-	rows, err := q.db.Query(ctx, getAvailableSeatsExecute, arg.GetAvailableSeats, arg.GetAvailableSeats_2)
+	rows, err := q.db.Query(ctx, getAvailableSeatsExecute, arg.TrainID, arg.TravelDate)
 	if err != nil {
 		return nil, err
 	}
@@ -370,11 +374,17 @@ func (q *Queries) GetTrainById(ctx context.Context, id int32) (Train, error) {
 
 const getTrainScheduleByDay = `-- name: GetTrainScheduleByDay :one
 SELECT id, trainid, day, arrivaltime, departuretime FROM trainSchedule
-WHERE trainId = $1
+WHERE trainId = $1 
+AND arrivalTime::DATE = $2::DATE
 `
 
-func (q *Queries) GetTrainScheduleByDay(ctx context.Context, trainid pgtype.Int4) (Trainschedule, error) {
-	row := q.db.QueryRow(ctx, getTrainScheduleByDay, trainid)
+type GetTrainScheduleByDayParams struct {
+	Trainid pgtype.Int4 `json:"trainid"`
+	Column2 pgtype.Date `json:"column_2"`
+}
+
+func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error) {
+	row := q.db.QueryRow(ctx, getTrainScheduleByDay, arg.Trainid, arg.Column2)
 	var i Trainschedule
 	err := row.Scan(
 		&i.ID,
@@ -435,10 +445,13 @@ func (q *Queries) ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSe
 }
 
 const validateTrain = `-- name: ValidateTrain :one
+
 SELECT COUNT(*)
 FROM train WHERE id = $1
 `
 
+// SELECT *
+// FROM get_available_seats(1, '2026-01-15');
 func (q *Queries) ValidateTrain(ctx context.Context, id int32) (int64, error) {
 	row := q.db.QueryRow(ctx, validateTrain, id)
 	var count int64

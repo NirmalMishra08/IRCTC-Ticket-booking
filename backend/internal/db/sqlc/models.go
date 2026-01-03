@@ -332,10 +332,11 @@ type Booking struct {
 }
 
 type Bookingitem struct {
-	ID              int32       `json:"id"`
-	Bookingid       pgtype.Int4 `json:"bookingid"`
-	Seatid          pgtype.Int4 `json:"seatid"`
-	Trainscheduleid pgtype.Int4 `json:"trainscheduleid"`
+	ID              int32         `json:"id"`
+	Bookingid       pgtype.Int4   `json:"bookingid"`
+	Seatid          pgtype.Int4   `json:"seatid"`
+	Bookingstatus   BookingStatus `json:"bookingstatus"`
+	Trainscheduleid pgtype.Int4   `json:"trainscheduleid"`
 }
 
 type Coach struct {

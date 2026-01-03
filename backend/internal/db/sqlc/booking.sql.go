@@ -68,7 +68,7 @@ func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (B
 const createBookingItem = `-- name: CreateBookingItem :one
 INSERT INTO bookingItem (bookingId, seatId, trainScheduleId)
 VALUES ($1, $2, $3)
-RETURNING id, bookingid, seatid, trainscheduleid
+RETURNING id, bookingid, seatid, bookingstatus, trainscheduleid
 `
 
 type CreateBookingItemParams struct {
@@ -84,6 +84,7 @@ func (q *Queries) CreateBookingItem(ctx context.Context, arg CreateBookingItemPa
 		&i.ID,
 		&i.Bookingid,
 		&i.Seatid,
+		&i.Bookingstatus,
 		&i.Trainscheduleid,
 	)
 	return i, err
@@ -280,8 +281,51 @@ func (q *Queries) GetBookingItemsByBooking(ctx context.Context, bookingid pgtype
 	return items, nil
 }
 
+const getBookingLockContext = `-- name: GetBookingLockContext :many
+SELECT
+    b.trainId,
+    b.travelDate,
+    bi.seatId,
+    b.holdToken
+FROM booking b
+JOIN bookingItem bi ON bi.bookingId = b.id
+WHERE b.id = $1
+`
+
+type GetBookingLockContextRow struct {
+	Trainid    pgtype.Int4 `json:"trainid"`
+	Traveldate pgtype.Date `json:"traveldate"`
+	Seatid     pgtype.Int4 `json:"seatid"`
+	Holdtoken  pgtype.Text `json:"holdtoken"`
+}
+
+func (q *Queries) GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error) {
+	rows, err := q.db.Query(ctx, getBookingLockContext, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetBookingLockContextRow{}
+	for rows.Next() {
+		var i GetBookingLockContextRow
+		if err := rows.Scan(
+			&i.Trainid,
+			&i.Traveldate,
+			&i.Seatid,
+			&i.Holdtoken,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBookingbyUserId = `-- name: GetBookingbyUserId :many
-SELECT bi.id, bi.bookingid, bi.seatid, bi.trainscheduleid , b.id, b.userid, b.trainid, b.traveldate, b.status, b.holdtoken, b.paymentid, b.createdat
+SELECT bi.id, bi.bookingid, bi.seatid, bi.bookingstatus, bi.trainscheduleid , b.id, b.userid, b.trainid, b.traveldate, b.status, b.holdtoken, b.paymentid, b.createdat
 FROM booking b 
 JOIN bookingItem bi 
 ON b.id = bi.bookingId
@@ -292,6 +336,7 @@ type GetBookingbyUserIdRow struct {
 	ID              int32            `json:"id"`
 	Bookingid       pgtype.Int4      `json:"bookingid"`
 	Seatid          pgtype.Int4      `json:"seatid"`
+	Bookingstatus   BookingStatus    `json:"bookingstatus"`
 	Trainscheduleid pgtype.Int4      `json:"trainscheduleid"`
 	ID_2            int32            `json:"id_2"`
 	Userid          pgtype.UUID      `json:"userid"`
@@ -316,6 +361,7 @@ func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([
 			&i.ID,
 			&i.Bookingid,
 			&i.Seatid,
+			&i.Bookingstatus,
 			&i.Trainscheduleid,
 			&i.ID_2,
 			&i.Userid,
@@ -336,6 +382,20 @@ func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([
 	return items, nil
 }
 
+const updateBookingItemStatus = `-- name: UpdateBookingItemStatus :exec
+UPDATE bookingItem SET bookingStatus = $2 WHERE bookingId = $1
+`
+
+type UpdateBookingItemStatusParams struct {
+	Bookingid     pgtype.Int4   `json:"bookingid"`
+	Bookingstatus BookingStatus `json:"bookingstatus"`
+}
+
+func (q *Queries) UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error {
+	_, err := q.db.Exec(ctx, updateBookingItemStatus, arg.Bookingid, arg.Bookingstatus)
+	return err
+}
+
 const updateBookingStatus = `-- name: UpdateBookingStatus :exec
 UPDATE booking
 SET status = $2
@@ -349,5 +409,19 @@ type UpdateBookingStatusParams struct {
 
 func (q *Queries) UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error {
 	_, err := q.db.Exec(ctx, updateBookingStatus, arg.ID, arg.Status)
+	return err
+}
+
+const updatePaymentStatus = `-- name: UpdatePaymentStatus :exec
+UPDATE payment SET status = $2 WHERE bookingId = $1
+`
+
+type UpdatePaymentStatusParams struct {
+	Bookingid pgtype.Int4       `json:"bookingid"`
+	Status    NullPaymentStatus `json:"status"`
+}
+
+func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error {
+	_, err := q.db.Exec(ctx, updatePaymentStatus, arg.Bookingid, arg.Status)
 	return err
 }

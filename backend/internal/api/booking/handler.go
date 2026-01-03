@@ -26,11 +26,13 @@ func NewHandler(config *config.Config, store db.Store, Redis redis.Client) *Hand
 
 func (h *Handler) Routes() *chi.Mux {
 	router := routes.DefaultRouter()
+	router.Post("/webhook/stripe", h.StripeWebhook)
 	// without middleware
 
 	router.Group(func(r chi.Router) {
 		r.Use(middleware.TokenMiddleware(h.store))
-		r.Post("/create-booking",h.CreateBooking)
+		r.Post("/create-booking", h.CreateBooking)
+
 		// with middleware
 
 	})
