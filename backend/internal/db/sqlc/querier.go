@@ -47,6 +47,8 @@ type Querier interface {
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
 	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
+	// SELECT *
+	// FROM get_available_seats(1, '2026-01-15');
 	ValidateTrain(ctx context.Context, id int32) (int64, error)
 }
 

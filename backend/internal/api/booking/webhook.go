@@ -29,12 +29,14 @@ func (h *Handler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		util.ErrorJson(w, errors.New("bad request"))
+		return
 	}
 
 	sig := r.Header.Get("Stripe-Signature")
-	event, err := webhook.ConstructEvent(payload, sig, h.config.STRIPE_SECRET_KEY)
+	event, err := webhook.ConstructEvent(payload, sig, h.config.STRIPE_WEBHOOK_SECRET)
 	if err != nil {
 		util.ErrorJson(w, fmt.Errorf("not able to create event"))
+		return
 	}
 
 	switch event.Type {
@@ -56,7 +58,7 @@ func (h *Handler) handlePaymentSuccess(event stripe.Event, ctx context.Context) 
 
 	bookingId, _ := strconv.Atoi(session.Metadata["booking_id"])
 
-	h.store.ExecTx(ctx, func(q *db.Queries) error {
+	if err := h.store.ExecTx(ctx, func(q *db.Queries) error {
 		err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
 			ID:     int32(bookingId),
 			Status: db.BookingStatusCONFIRMED,
@@ -73,8 +75,18 @@ func (h *Handler) handlePaymentSuccess(event stripe.Event, ctx context.Context) 
 			return err
 		}
 
+		err = q.UpdatePaymentStatus(ctx, db.UpdatePaymentStatusParams{
+			Bookingid: util.ToPgInt4(int32(bookingId)),
+			Status:    db.NullPaymentStatus{PaymentStatus: db.PaymentStatusSUCCESS, Valid: true},
+		})
+		if err != nil {
+			return err
+		}
+
 		return nil
-	})
+	}); err != nil {
+		logger.Error("error occurred while updating booking status", err)
+	}
 
 }
 

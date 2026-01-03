@@ -69,14 +69,12 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	err = h.store.ExpireOldBooking(ctx)
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--1>")
 		return
 	}
 	// check if the user have some active bookings
 	booking, err := h.store.GetActiveBookingByUser(ctx, pgtype.UUID{Bytes: payload.UserId, Valid: true})
 	if err != nil && err.Error() != "no rows in result set" {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--2>", err)
 		return
 	}
 
@@ -88,7 +86,6 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	count, err := h.store.ValidateTrain(ctx, int32(data.TrainId))
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--3>")
 		return
 	}
 	if count == 0 {
@@ -109,7 +106,6 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--4>", err)
 		return
 	}
 	if trainScheduleCount == 0 {
@@ -144,7 +140,6 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		util.ErrorJson(w, util.ErrInternal)
-		logger.Debug("here--5>", err)
 		return
 	}
 
@@ -195,12 +190,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 		bookingID = bookingInProcess.ID
 
-		// trainScheduled, err := q.GetTrainScheduleByDay(ctx, db.GetTrainScheduleByDayParams{
-		// 	Trainid:     util.ToPgInt4(int32(data.TrainId)),
-		// 	Arrivaltime: travelDate,
-		// })
-
-		logger.Debug("hello --->",travelDate)
+		
 		trainScheduled, err := q.GetTrainScheduleByDay(ctx, db.GetTrainScheduleByDayParams{
 			Trainid: util.ToPgInt4(int32(data.TrainId)),
 			Column2: pgtype.Date{Time: travelDate,Valid: true},
@@ -236,8 +226,6 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	var amount int32
 	amount = CalculateFare(int32(len(seatIDs)))
-
-	logger.Debug("hello------>"+h.config.STRIPE_SECRET_KEY)
 
 	paymentIntent, err := stripe.StripeSession(ctx, payload.UserId.String(), strconv.Itoa(int(amount)), "seatIds:", h.config.STRIPE_SECRET_KEY, int(bookingID), holdToken)
 	if err != nil {

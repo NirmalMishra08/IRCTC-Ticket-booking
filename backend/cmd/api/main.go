@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,7 +21,7 @@ func main() {
 	}
 	fmt.Println("Connecting to DB:", cfg.POSTGRES_CONNECTION)
 
-	rdb:= redis.RedisConnect(cfg.REDIS_DB_URL, cfg.REDIS_PASSWORD)
+	rdb := redis.RedisConnect(cfg.REDIS_DB_URL, cfg.REDIS_PASSWORD)
 
 	defer rdb.Close()
 

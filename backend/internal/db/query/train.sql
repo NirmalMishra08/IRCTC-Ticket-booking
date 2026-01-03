@@ -78,7 +78,14 @@ END;
 $$;
 
 -- name: GetAvailableSeatsExecute :many
-SELECT * FROM get_available_seats($1, $2);
+SELECT *
+FROM get_available_seats(
+    sqlc.arg(train_id)::int,
+    sqlc.arg(travel_date)::date
+);
+
+-- SELECT *
+-- FROM get_available_seats(1, '2026-01-15');
 
 -- name: ValidateTrain :one
 SELECT COUNT(*)
