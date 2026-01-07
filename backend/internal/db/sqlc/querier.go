@@ -35,6 +35,7 @@ type Querier interface {
 	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
+	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
