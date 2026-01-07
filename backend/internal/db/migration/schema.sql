@@ -31,6 +31,12 @@ CREATE TYPE payment_status AS ENUM (
     'SUCCESS'
 );
 
+CREATE TYPE refund_status AS ENUM (
+    'PENDING',
+    'FAILED',
+    'SUCCESS'
+);
+
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fullname TEXT NOT NULL,
@@ -120,8 +126,20 @@ CREATE TABLE bookingItem (
 ALTER TABLE payment
 ADD CONSTRAINT fk_payment_booking
 FOREIGN KEY (bookingId) 
-REFERENCES booking(id) 
+REFERENCES booking(id)
 ON DELETE RESTRICT;
+
+
+CREATE TABLE Refund (
+    id SERIAL PRIMARY KEY,
+    userId uuid REFERENCES users(id) on delete CASCADE,
+    bookingId INTEGER REFERENCES booking(id) on delete CASCADE,
+    amount INTEGER NOT NULL,
+    status refund_status not null DEFAULT 'PENDING',
+    createdAt TIMESTAMP NOT NULL DEFAULT now(),
+    updatedAt TIMESTAMP NOT NULL DEFAULT now()
+
+);
 
 CREATE UNIQUE INDEX unique_confirmed_seat_per_schedule
 ON bookingItem (seatId, trainScheduleId)

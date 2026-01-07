@@ -278,6 +278,49 @@ func (ns NullProvider) Value() (driver.Value, error) {
 	return string(ns.Provider), nil
 }
 
+type RefundStatus string
+
+const (
+	RefundStatusPENDING RefundStatus = "PENDING"
+	RefundStatusFAILED  RefundStatus = "FAILED"
+	RefundStatusSUCCESS RefundStatus = "SUCCESS"
+)
+
+func (e *RefundStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RefundStatus(s)
+	case string:
+		*e = RefundStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RefundStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRefundStatus struct {
+	RefundStatus RefundStatus `json:"refund_status"`
+	Valid        bool         `json:"valid"` // Valid is true if RefundStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRefundStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RefundStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RefundStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRefundStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RefundStatus), nil
+}
+
 type UserRole string
 
 const (
@@ -353,6 +396,16 @@ type Payment struct {
 	Status        NullPaymentStatus `json:"status"`
 	Transactionid string            `json:"transactionid"`
 	Createdat     pgtype.Timestamp  `json:"createdat"`
+}
+
+type Refund struct {
+	ID        int32            `json:"id"`
+	Userid    pgtype.UUID      `json:"userid"`
+	Bookingid pgtype.Int4      `json:"bookingid"`
+	Amount    int32            `json:"amount"`
+	Status    RefundStatus     `json:"status"`
+	Createdat pgtype.Timestamp `json:"createdat"`
+	Updatedat pgtype.Timestamp `json:"updatedat"`
 }
 
 type Seat struct {
