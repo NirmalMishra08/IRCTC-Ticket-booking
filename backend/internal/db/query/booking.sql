@@ -105,6 +105,10 @@ FROM booking b
 JOIN bookingItem bi ON bi.bookingId = b.id
 WHERE b.id = $1;
 
+-- name: DeleteBookingItem :exec
+DELETE FROM
+bookingItem b WHERE bookingId = $1 ;
+
 
 
 

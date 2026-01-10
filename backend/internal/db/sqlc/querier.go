@@ -17,11 +17,13 @@ type Querier interface {
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+	CreateRefund(ctx context.Context, arg CreateRefundParams) (Refund, error)
 	CreateSeat(ctx context.Context, arg CreateSeatParams) (Seat, error)
 	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
 	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CurrentAvailabeSeats(ctx context.Context, arg CurrentAvailabeSeatsParams) ([]int32, error)
+	DeleteBookingItem(ctx context.Context, bookingid pgtype.Int4) error
 	DeleteBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) error
 	ExpireOldBooking(ctx context.Context) error
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)

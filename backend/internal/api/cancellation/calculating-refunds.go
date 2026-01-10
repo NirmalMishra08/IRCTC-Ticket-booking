@@ -58,18 +58,67 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if trainWithAmount.PaymentStatus.PaymentStatus != db.PaymentStatusSUCCESS {
+		util.ErrorJson(w, fmt.Errorf("payment was not successfull during booking"))
+		return
+	}
+
+	if trainWithAmount.BookingStatus != db.BookingStatusCONFIRMED {
+		util.ErrorJson(w, fmt.Errorf("no seats were confirmed"))
+	}
+	// calculate the refund
 	var amount float64
 	amount = trainWithAmount.Amount
 	amountStr := fmt.Sprintf("%.2f", amount)
+
+	bookingId := trainWithAmount.BookingID
 
 	apiResponse, err := stripe.RefundSession(ctx, userId.String(), amountStr, trainWithAmount.Holdtoken.String, h.config.REDIS_DB_URL)
 	if err != nil || apiResponse == nil {
 		util.ErrorJson(w, err)
 	}
+	//begin db transaction
+	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+		// update booking -> cancelled
+		err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+			ID:     bookingId,
+			Status: db.BookingStatusCANCELLED,
+		})
 
-	if apiResponse.Status == "success" {
+		if err != nil {
+			return fmt.Errorf("not able to update the db: %w", err)
+		}
 
+		// update payment
+
+		_, err = q.CreateRefund(ctx, db.CreateRefundParams{
+			Userid:    pgtype.UUID{Bytes: userId, Valid: true},
+			Bookingid: util.ToPgInt4(bookingId),
+			Amount:    int32(amount),
+			Status:    db.RefundStatusSUCCESS,
+		})
+		if err != nil {
+			return fmt.Errorf("not able to create the refund: %w", err)
+		}
+
+		err = q.DeleteBookingItem(ctx, util.ToPgInt4(bookingId))
+		if err != nil {
+			return fmt.Errorf("not able to delete  the booking items table: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		util.ErrorJson(w, err)
+		return
 	}
+
+	response := map[string]interface{}{
+		"message":"refund in process",
+		"response_stripe":apiResponse,
+	}
+
+	util.WriteJson(w,http.StatusOK,response);
 
 }
 

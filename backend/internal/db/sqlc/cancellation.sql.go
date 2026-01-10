@@ -11,8 +11,41 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createRefund = `-- name: CreateRefund :one
+INSERT INTO refund (userId , bookingId , amount , status , createdAt, updatedAt) 
+VALUES ( $1 , $2 , $3 , $4 , now() , now() )
+RETURNING id, userid, bookingid, amount, status, createdat, updatedat
+`
+
+type CreateRefundParams struct {
+	Userid    pgtype.UUID  `json:"userid"`
+	Bookingid pgtype.Int4  `json:"bookingid"`
+	Amount    int32        `json:"amount"`
+	Status    RefundStatus `json:"status"`
+}
+
+func (q *Queries) CreateRefund(ctx context.Context, arg CreateRefundParams) (Refund, error) {
+	row := q.db.QueryRow(ctx, createRefund,
+		arg.Userid,
+		arg.Bookingid,
+		arg.Amount,
+		arg.Status,
+	)
+	var i Refund
+	err := row.Scan(
+		&i.ID,
+		&i.Userid,
+		&i.Bookingid,
+		&i.Amount,
+		&i.Status,
+		&i.Createdat,
+		&i.Updatedat,
+	)
+	return i, err
+}
+
 const getPaymentAndTrain = `-- name: GetPaymentAndTrain :one
-SELECT p.amount,p.status as payment_status,b.travelDate , b.holdToken , b.status as booking_status FROM
+SELECT p.amount,p.status as payment_status,b.id as booking_id , b.travelDate , b.holdToken , b.status as booking_status FROM
 booking b JOIN
 payment p ON b.id = p.bookingId
 WHERE b.trainId = $2 AND b.userId = $1 AND b.travelDate = $3
@@ -28,6 +61,7 @@ type GetPaymentAndTrainParams struct {
 type GetPaymentAndTrainRow struct {
 	Amount        float64           `json:"amount"`
 	PaymentStatus NullPaymentStatus `json:"payment_status"`
+	BookingID     int32             `json:"booking_id"`
 	Traveldate    pgtype.Date       `json:"traveldate"`
 	Holdtoken     pgtype.Text       `json:"holdtoken"`
 	BookingStatus BookingStatus     `json:"booking_status"`
@@ -39,6 +73,7 @@ func (q *Queries) GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrain
 	err := row.Scan(
 		&i.Amount,
 		&i.PaymentStatus,
+		&i.BookingID,
 		&i.Traveldate,
 		&i.Holdtoken,
 		&i.BookingStatus,

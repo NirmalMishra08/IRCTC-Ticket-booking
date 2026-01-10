@@ -157,6 +157,16 @@ func (q *Queries) CurrentAvailabeSeats(ctx context.Context, arg CurrentAvailabeS
 	return items, nil
 }
 
+const deleteBookingItem = `-- name: DeleteBookingItem :exec
+DELETE FROM
+bookingItem b WHERE bookingId = $1
+`
+
+func (q *Queries) DeleteBookingItem(ctx context.Context, bookingid pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteBookingItem, bookingid)
+	return err
+}
+
 const deleteBookingItemsByBooking = `-- name: DeleteBookingItemsByBooking :exec
 DELETE FROM bookingItem WHERE bookingId = $1
 `
