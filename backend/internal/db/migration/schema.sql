@@ -21,9 +21,16 @@ CREATE type berth_type as ENUM ('UP','DOWN','MID');
 CREATE TYPE booking_status AS ENUM (
     'PENDING',
     'CONFIRMED',
+    'WAITLIST'
     'CANCELLED',
     'EXPIRED'
 );
+
+CREATE type waiting_status as ENUM (
+    'WAITING',
+    'CONFIRMED',
+    'CANCELLED'
+)
 
 CREATE TYPE payment_status AS ENUM (
     'PENDING',
@@ -144,6 +151,18 @@ CREATE TABLE Refund (
 CREATE UNIQUE INDEX unique_confirmed_seat_per_schedule
 ON bookingItem (seatId, trainScheduleId)
 WHERE bookingStatus = 'CONFIRMED';
+
+
+CREATE TABLE waitlist (
+    id SERIAL PRIMARY KEY
+    trainscheduleid INTEGER REFERENCES trainSchedule(id) on delete RESTRICT,
+    bookingId INTEGER REFERENCES booking(id) on delete cascade,
+    waitlist_number INTEGER not NULL,
+    status  waiting_status NOT NULL DEFAULT 'WAITING',
+    priority_level INTEGER DEFAULT 10
+    createdAt TIMESTAMP not NULL DEFAULT now(),
+    updatedAt TIMESTAMP not NULL DEFAULT now()
+)
 
 
 
