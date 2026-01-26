@@ -23,8 +23,14 @@ CREATE TYPE booking_status AS ENUM (
     'CONFIRMED',
     'WAITLIST'
     'CANCELLED',
-    'EXPIRED'
+    'EXPIRED',
 );
+
+CREATE TYPE booking_type as ENUM (
+    'NORMAL',
+    'WAITLIST',
+    'TATKAL'
+)
 
 CREATE type waiting_status as ENUM (
     'WAITING',
@@ -81,7 +87,7 @@ CREATE TABLE trainSchedule (
 
 CREATE Table tatkal_config (
     id SERIAL PRIMARY KEY,
-    trainId INTEGER REFERENCES train(id) ON Delete CASCADE,
+    train_id INTEGER REFERENCES train(id) ON Delete CASCADE,
     coachType coach_type NOT NULL,
     tatkal_start_time TIMESTAMP NOT NULL,
     tatkal_end_time TIMESTAMP NOT NULL,
@@ -89,6 +95,19 @@ CREATE Table tatkal_config (
     updated_at TIMESTAMP DEFAULT now(),
     UNIQUE(train_id, coach_type)
 );
+
+CREATE TABLE tatkal_waitlist (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES user(id),
+    train_id INT REFERENCES train(id),
+    coach_type coach_type NOT NULL,
+    travel_date DATE NOT NULL,
+    wl_position INT NOT NULL,
+    status TEXT DEFAULT 'WAITING',
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE(user_id, train_id, travel_date)
+);
+
 
 CREATE TABLE coach (
    id SERIAL PRIMARY KEY,
@@ -126,6 +145,9 @@ CREATE TABLE booking (
     createdAt TIMESTAMP NOT NULL DEFAULT now()
 
 );
+ALTER TABLE booking
+ADD COLUMN booking_type TEXT DEFAULT 'NORMAL';
+
 
 CREATE TABLE bookingItem (
     id SERIAL PRIMARY KEY,
