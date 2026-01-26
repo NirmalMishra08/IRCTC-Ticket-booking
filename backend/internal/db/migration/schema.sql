@@ -76,11 +76,18 @@ CREATE TABLE trainSchedule (
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
 
-CREATE Table tatkal (
+
+-- i have changed the tatkal schema
+
+CREATE Table tatkal_config (
     id SERIAL PRIMARY KEY,
     trainId INTEGER REFERENCES train(id) ON Delete CASCADE,
     coachType coach_type NOT NULL,
-    totalSeats INT
+    tatkal_start_time TIMESTAMP NOT NULL,
+    tatkal_end_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    UNIQUE(train_id, coach_type)
 );
 
 CREATE TABLE coach (
