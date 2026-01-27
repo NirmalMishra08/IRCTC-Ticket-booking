@@ -21,9 +21,22 @@ CREATE type berth_type as ENUM ('UP','DOWN','MID');
 CREATE TYPE booking_status AS ENUM (
     'PENDING',
     'CONFIRMED',
+    'WAITLIST'
     'CANCELLED',
-    'EXPIRED'
+    'EXPIRED',
 );
+
+CREATE TYPE booking_type as ENUM (
+    'NORMAL',
+    'WAITLIST',
+    'TATKAL'
+)
+
+CREATE type waiting_status as ENUM (
+    'WAITING',
+    'CONFIRMED',
+    'CANCELLED'
+)
 
 CREATE TYPE payment_status AS ENUM (
     'PENDING',
@@ -69,12 +82,32 @@ CREATE TABLE trainSchedule (
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
 
-CREATE Table tatkal (
+
+-- i have changed the tatkal schema
+
+CREATE Table tatkal_config (
     id SERIAL PRIMARY KEY,
-    trainId INTEGER REFERENCES train(id) ON Delete CASCADE,
+    train_id INTEGER REFERENCES train(id) ON Delete CASCADE,
     coachType coach_type NOT NULL,
-    totalSeats INT
+    tatkal_start_time TIMESTAMP NOT NULL,
+    tatkal_end_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    UNIQUE(train_id, coach_type)
 );
+
+CREATE TABLE tatkal_waitlist (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES user(id),
+    train_id INT REFERENCES train(id),
+    coach_type coach_type NOT NULL,
+    travel_date DATE NOT NULL,
+    wl_position INT NOT NULL,
+    status TEXT DEFAULT 'WAITING',
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE(user_id, train_id, travel_date)
+);
+
 
 CREATE TABLE coach (
    id SERIAL PRIMARY KEY,
@@ -112,6 +145,9 @@ CREATE TABLE booking (
     createdAt TIMESTAMP NOT NULL DEFAULT now()
 
 );
+ALTER TABLE booking
+ADD COLUMN booking_type TEXT DEFAULT 'NORMAL';
+
 
 CREATE TABLE bookingItem (
     id SERIAL PRIMARY KEY,
@@ -144,6 +180,18 @@ CREATE TABLE Refund (
 CREATE UNIQUE INDEX unique_confirmed_seat_per_schedule
 ON bookingItem (seatId, trainScheduleId)
 WHERE bookingStatus = 'CONFIRMED';
+
+
+CREATE TABLE waitlist (
+    id SERIAL PRIMARY KEY
+    trainscheduleid INTEGER REFERENCES trainSchedule(id) on delete RESTRICT,
+    bookingId INTEGER REFERENCES booking(id) on delete cascade,
+    waitlist_number INTEGER not NULL,
+    status  waiting_status NOT NULL DEFAULT 'WAITING',
+    priority_level INTEGER DEFAULT 10
+    createdAt TIMESTAMP not NULL DEFAULT now(),
+    updatedAt TIMESTAMP not NULL DEFAULT now()
+)
 
 
 
