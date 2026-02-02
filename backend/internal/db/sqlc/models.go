@@ -61,6 +61,7 @@ type BookingStatus string
 const (
 	BookingStatusPENDING   BookingStatus = "PENDING"
 	BookingStatusCONFIRMED BookingStatus = "CONFIRMED"
+	BookingStatusWAITLIST  BookingStatus = "WAITLIST"
 	BookingStatusCANCELLED BookingStatus = "CANCELLED"
 	BookingStatusEXPIRED   BookingStatus = "EXPIRED"
 )
@@ -98,6 +99,49 @@ func (ns NullBookingStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.BookingStatus), nil
+}
+
+type BookingType string
+
+const (
+	BookingTypeNORMAL   BookingType = "NORMAL"
+	BookingTypeWAITLIST BookingType = "WAITLIST"
+	BookingTypeTATKAL   BookingType = "TATKAL"
+)
+
+func (e *BookingType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = BookingType(s)
+	case string:
+		*e = BookingType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for BookingType: %T", src)
+	}
+	return nil
+}
+
+type NullBookingType struct {
+	BookingType BookingType `json:"booking_type"`
+	Valid       bool        `json:"valid"` // Valid is true if BookingType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullBookingType) Scan(value interface{}) error {
+	if value == nil {
+		ns.BookingType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.BookingType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullBookingType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.BookingType), nil
 }
 
 type CoachType string
@@ -363,15 +407,59 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type WaitingStatus string
+
+const (
+	WaitingStatusWAITING   WaitingStatus = "WAITING"
+	WaitingStatusCONFIRMED WaitingStatus = "CONFIRMED"
+	WaitingStatusCANCELLED WaitingStatus = "CANCELLED"
+)
+
+func (e *WaitingStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WaitingStatus(s)
+	case string:
+		*e = WaitingStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WaitingStatus: %T", src)
+	}
+	return nil
+}
+
+type NullWaitingStatus struct {
+	WaitingStatus WaitingStatus `json:"waiting_status"`
+	Valid         bool          `json:"valid"` // Valid is true if WaitingStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWaitingStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.WaitingStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WaitingStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWaitingStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WaitingStatus), nil
+}
+
 type Booking struct {
-	ID         int32            `json:"id"`
-	Userid     pgtype.UUID      `json:"userid"`
-	Trainid    pgtype.Int4      `json:"trainid"`
-	Traveldate pgtype.Date      `json:"traveldate"`
-	Status     BookingStatus    `json:"status"`
-	Holdtoken  pgtype.Text      `json:"holdtoken"`
-	Paymentid  pgtype.Int4      `json:"paymentid"`
-	Createdat  pgtype.Timestamp `json:"createdat"`
+	ID          int32            `json:"id"`
+	Userid      pgtype.UUID      `json:"userid"`
+	Trainid     pgtype.Int4      `json:"trainid"`
+	Traveldate  pgtype.Date      `json:"traveldate"`
+	Status      BookingStatus    `json:"status"`
+	Holdtoken   pgtype.Text      `json:"holdtoken"`
+	Paymentid   pgtype.Int4      `json:"paymentid"`
+	Createdat   pgtype.Timestamp `json:"createdat"`
+	BookingType pgtype.Text      `json:"booking_type"`
 }
 
 type Bookingitem struct {
@@ -387,6 +475,14 @@ type Coach struct {
 	Trainid     pgtype.Int4 `json:"trainid"`
 	Coachtype   CoachType   `json:"coachtype"`
 	Coachnumber int32       `json:"coachnumber"`
+}
+
+type Passenger struct {
+	ID            int32            `json:"id"`
+	Name          string           `json:"name"`
+	Bookingitemid pgtype.Int4      `json:"bookingitemid"`
+	Age           int32            `json:"age"`
+	Createdat     pgtype.Timestamp `json:"createdat"`
 }
 
 type Payment struct {
@@ -415,11 +511,25 @@ type Seat struct {
 	Berth   BerthType   `json:"berth"`
 }
 
-type Tatkal struct {
-	ID         int32       `json:"id"`
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Coachtype  CoachType   `json:"coachtype"`
-	Totalseats pgtype.Int4 `json:"totalseats"`
+type TatkalConfig struct {
+	ID              int32            `json:"id"`
+	TrainID         pgtype.Int4      `json:"train_id"`
+	Coachtype       CoachType        `json:"coachtype"`
+	TatkalStartTime pgtype.Timestamp `json:"tatkal_start_time"`
+	TatkalEndTime   pgtype.Timestamp `json:"tatkal_end_time"`
+	CreatedAt       pgtype.Timestamp `json:"created_at"`
+	UpdatedAt       pgtype.Timestamp `json:"updated_at"`
+}
+
+type TatkalWaitlist struct {
+	ID         int32            `json:"id"`
+	UserID     uuid.UUID        `json:"user_id"`
+	TrainID    pgtype.Int4      `json:"train_id"`
+	CoachType  CoachType        `json:"coach_type"`
+	TravelDate pgtype.Date      `json:"travel_date"`
+	WlPosition int32            `json:"wl_position"`
+	Status     pgtype.Text      `json:"status"`
+	CreatedAt  pgtype.Timestamp `json:"created_at"`
 }
 
 type Train struct {
@@ -448,4 +558,15 @@ type User struct {
 	CreatedAt    pgtype.Timestamp `json:"created_at"`
 	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
 	Phone        pgtype.Text      `json:"phone"`
+}
+
+type Waitlist struct {
+	ID              int32            `json:"id"`
+	Trainscheduleid pgtype.Int4      `json:"trainscheduleid"`
+	Bookingid       pgtype.Int4      `json:"bookingid"`
+	WaitlistNumber  int32            `json:"waitlist_number"`
+	Status          WaitingStatus    `json:"status"`
+	PriorityLevel   pgtype.Int4      `json:"priority_level"`
+	Createdat       pgtype.Timestamp `json:"createdat"`
+	Updatedat       pgtype.Timestamp `json:"updatedat"`
 }
