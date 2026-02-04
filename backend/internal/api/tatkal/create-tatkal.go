@@ -66,7 +66,10 @@ func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
+	err = h.EnqueueTatkalUser(ctx, TrainId, data.travelDate, data.coach_type, userId.String())
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("not able to add user into queue"))
+	}
 
 }
 
@@ -75,7 +78,7 @@ func (h *Handler) EnqueueTatkalUser(ctx context.Context, trainId int, date strin
 	score := float64(time.Now().UnixNano())
 
 	return h.Redis.ZAdd(ctx, key, redis.Z{
-		Score: score,
+		Score:  score,
 		Member: userId,
 	}).Err()
 }
