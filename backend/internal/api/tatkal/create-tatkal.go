@@ -30,6 +30,10 @@ type PassenngerDetails struct {
 func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	payload, err := middleware.GetFirebasePayloadFromContext(ctx)
+	if err != nil {
+		util.ErrorJson(w, util.ErrUnauthorized)
+		return
+	}
 
 	var data TatkalRequest
 	err = json.NewDecoder(r.Body).Decode(&data)
@@ -51,11 +55,11 @@ func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if tatkalData.TatkalStartTime.Valid && tatkalData.TatkalStartTime.Time.Before(time.Now()) {
+	if tatkalData.TatkalStartTime.Valid && tatkalData.TatkalStartTime.Time.After(time.Now()) {
 		util.ErrorJson(w, errors.New("tatkal booking window is not open"))
 		return
 	}
-	if tatkalData.TatkalEndTime.Valid && tatkalData.TatkalEndTime.Time.After(time.Now()) {
+	if tatkalData.TatkalEndTime.Valid && tatkalData.TatkalEndTime.Time.Before(time.Now()) {
 		util.ErrorJson(w, errors.New("tatkal booking window is not open"))
 		return
 	}
@@ -71,6 +75,11 @@ func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, fmt.Errorf("not able to add user into queue"))
 	}
 
+	response := map[string]interface{}{
+		"message": "user in queue",
+	}
+
+	util.WriteJson(w, http.StatusAccepted, response)
 }
 
 func (h *Handler) EnqueueTatkalUser(ctx context.Context, trainId int, date string, coachType string, userId string) error {
@@ -81,4 +90,17 @@ func (h *Handler) EnqueueTatkalUser(ctx context.Context, trainId int, date strin
 		Score:  score,
 		Member: userId,
 	}).Err()
+}
+
+func (h *Handler) DequeueTatkalUser(ctx context.Context, trainId int, date string, coachType string) (string, error) {
+	key := fmt.Sprintf("tatkal:queue:%d:%s:%s", trainId, date, coachType)
+
+	result, err := h.Redis.ZPopMin(ctx, key, 1).Result()
+	if err != nil || len(result) == 0 {
+		return "", err
+	}
+
+	userId := result[0].Member.(string)
+	return userId, nil
+
 }
