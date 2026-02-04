@@ -21,22 +21,22 @@ CREATE type berth_type as ENUM ('UP','DOWN','MID');
 CREATE TYPE booking_status AS ENUM (
     'PENDING',
     'CONFIRMED',
-    'WAITLIST'
+    'WAITLIST',
     'CANCELLED',
-    'EXPIRED',
+    'EXPIRED'
 );
 
 CREATE TYPE booking_type as ENUM (
     'NORMAL',
     'WAITLIST',
     'TATKAL'
-)
+);
 
 CREATE type waiting_status as ENUM (
     'WAITING',
     'CONFIRMED',
     'CANCELLED'
-)
+);
 
 CREATE TYPE payment_status AS ENUM (
     'PENDING',
@@ -98,7 +98,7 @@ CREATE Table tatkal_config (
 
 CREATE TABLE tatkal_waitlist (
     id SERIAL PRIMARY KEY,
-    user_id UUID REFERENCES user(id),
+    user_id UUID REFERENCES users(id) not null,
     train_id INT REFERENCES train(id),
     coach_type coach_type NOT NULL,
     travel_date DATE NOT NULL,
@@ -145,6 +145,10 @@ CREATE TABLE booking (
     createdAt TIMESTAMP NOT NULL DEFAULT now()
 
 );
+
+
+
+
 ALTER TABLE booking
 ADD COLUMN booking_type TEXT DEFAULT 'NORMAL';
 
@@ -166,6 +170,16 @@ REFERENCES booking(id)
 ON DELETE RESTRICT;
 
 
+-- not made table till now
+CREATE TABLE passenger (
+   id serial PRIMARY KEY,
+   name text not null,
+   bookingItemId INTEGER REFERENCES bookingItem(id) on DELETE CASCADE,
+   age int not NULL,
+   createdAt TIMESTAMP not null DEFAULT now()
+);
+
+
 CREATE TABLE Refund (
     id SERIAL PRIMARY KEY,
     userId uuid REFERENCES users(id) on delete CASCADE,
@@ -183,15 +197,15 @@ WHERE bookingStatus = 'CONFIRMED';
 
 
 CREATE TABLE waitlist (
-    id SERIAL PRIMARY KEY
+    id SERIAL PRIMARY KEY,
     trainscheduleid INTEGER REFERENCES trainSchedule(id) on delete RESTRICT,
     bookingId INTEGER REFERENCES booking(id) on delete cascade,
     waitlist_number INTEGER not NULL,
     status  waiting_status NOT NULL DEFAULT 'WAITING',
-    priority_level INTEGER DEFAULT 10
+    priority_level INTEGER DEFAULT 10,
     createdAt TIMESTAMP not NULL DEFAULT now(),
     updatedAt TIMESTAMP not NULL DEFAULT now()
-)
+);
 
 
 

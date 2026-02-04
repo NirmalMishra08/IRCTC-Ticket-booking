@@ -34,7 +34,7 @@ func (q *Queries) CountActiveBookingByTrain(ctx context.Context, arg CountActive
 const createBooking = `-- name: CreateBooking :one
 INSERT INTO booking (userId, trainId, travelDate, status, holdToken)
 VALUES ($1, $2, $3, 'PENDING', $4)
-RETURNING id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat
+RETURNING id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type
 `
 
 type CreateBookingParams struct {
@@ -61,6 +61,7 @@ func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (B
 		&i.Holdtoken,
 		&i.Paymentid,
 		&i.Createdat,
+		&i.BookingType,
 	)
 	return i, err
 }
@@ -189,7 +190,7 @@ func (q *Queries) ExpireOldBooking(ctx context.Context) error {
 }
 
 const getActiveBookingByUser = `-- name: GetActiveBookingByUser :one
-SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat
+SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type
 FROM booking
 WHERE userid = $1
   AND status = 'PENDING'
@@ -209,6 +210,7 @@ func (q *Queries) GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID
 		&i.Holdtoken,
 		&i.Paymentid,
 		&i.Createdat,
+		&i.BookingType,
 	)
 	return i, err
 }
@@ -248,7 +250,7 @@ func (q *Queries) GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) 
 }
 
 const getBookingByHoldToken = `-- name: GetBookingByHoldToken :one
-SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat FROM booking WHERE holdToken = $1
+SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type FROM booking WHERE holdToken = $1
 `
 
 func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error) {
@@ -263,6 +265,7 @@ func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Te
 		&i.Holdtoken,
 		&i.Paymentid,
 		&i.Createdat,
+		&i.BookingType,
 	)
 	return i, err
 }
@@ -335,7 +338,7 @@ func (q *Queries) GetBookingLockContext(ctx context.Context, id int32) ([]GetBoo
 }
 
 const getBookingbyUserId = `-- name: GetBookingbyUserId :many
-SELECT bi.id, bi.bookingid, bi.seatid, bi.bookingstatus, bi.trainscheduleid , b.id, b.userid, b.trainid, b.traveldate, b.status, b.holdtoken, b.paymentid, b.createdat
+SELECT bi.id, bi.bookingid, bi.seatid, bi.bookingstatus, bi.trainscheduleid , b.id, b.userid, b.trainid, b.traveldate, b.status, b.holdtoken, b.paymentid, b.createdat, b.booking_type
 FROM booking b 
 JOIN bookingItem bi 
 ON b.id = bi.bookingId
@@ -356,6 +359,7 @@ type GetBookingbyUserIdRow struct {
 	Holdtoken       pgtype.Text      `json:"holdtoken"`
 	Paymentid       pgtype.Int4      `json:"paymentid"`
 	Createdat       pgtype.Timestamp `json:"createdat"`
+	BookingType     pgtype.Text      `json:"booking_type"`
 }
 
 func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error) {
@@ -381,6 +385,7 @@ func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([
 			&i.Holdtoken,
 			&i.Paymentid,
 			&i.Createdat,
+			&i.BookingType,
 		); err != nil {
 			return nil, err
 		}

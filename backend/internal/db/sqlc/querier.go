@@ -40,6 +40,7 @@ type Querier interface {
 	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
+	GetTatkaData(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
 	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
