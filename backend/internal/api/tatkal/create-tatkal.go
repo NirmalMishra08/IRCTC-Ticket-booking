@@ -10,21 +10,19 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type TatkalRequest struct {
-	trainId    string
-	travelDate string
-	coach_type string
-	passengers []PassenngerDetails
+	trainId    string              `json:"train_id,omitempty"`
+	travelDate string              `json:"travel_date,omitempty"`
+	coach_type string              `json:"coach_type,omitempty"`
+	passengers []PassengerDetails `json:"passengers,omitempty"`
 }
 
-type PassenngerDetails struct {
-	name   string
-	age    int
-	gender string
+type PassengerDetails struct {
+	name   string `json:"name,omitempty"`
+	age    int    `json:"age,omitempty"`
+	gender string `json:"gender,omitempty"`
 }
 
 func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +68,7 @@ func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.EnqueueTatkalUser(ctx, TrainId, data.travelDate, data.coach_type, userId.String())
+	err = h.ProcessTatkalUser(ctx, data, userId.String())
 	if err != nil {
 		util.ErrorJson(w, fmt.Errorf("not able to add user into queue"))
 	}
@@ -82,25 +80,19 @@ func (h *Handler) CreateTatkalBooking(w http.ResponseWriter, r *http.Request) {
 	util.WriteJson(w, http.StatusAccepted, response)
 }
 
-func (h *Handler) EnqueueTatkalUser(ctx context.Context, trainId int, date string, coachType string, userId string) error {
-	key := fmt.Sprintf("tatkal:queue:%d:%s:%s", trainId, date, coachType)
-	score := float64(time.Now().UnixNano())
-
-	return h.Redis.ZAdd(ctx, key, redis.Z{
-		Score:  score,
-		Member: userId,
-	}).Err()
-}
-
-func (h *Handler) DequeueTatkalUser(ctx context.Context, trainId int, date string, coachType string) (string, error) {
-	key := fmt.Sprintf("tatkal:queue:%d:%s:%s", trainId, date, coachType)
-
-	result, err := h.Redis.ZPopMin(ctx, key, 1).Result()
-	if err != nil || len(result) == 0 {
-		return "", err
+func (h *Handler) ProcessTatkalUser(ctx context.Context, data TatkalRequest, userId string) error {
+	msg := map[string]interface{}{
+		"user_id":     userId,
+		"train_id":    data.trainId,
+		"travel_date": data.travelDate,
+		"coach_type":  data.coach_type,
+		"passengers":  data.passengers,
 	}
 
-	userId := result[0].Member.(string)
-	return userId, nil
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 
+	return h.Kafka.Publish(ctx, "tatkal-requests", userId, bytes)
 }
