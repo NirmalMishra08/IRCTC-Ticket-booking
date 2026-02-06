@@ -39,6 +39,7 @@ func (c *SaramaConsumer) Start(ctx context.Context) error {
 			log.Println("consumer error:", c.name, err)
 		}
 		if ctx.Err() != nil {
+			log.Println("stopping consumer:", c.name)
 			return ctx.Err()
 		}
 	}
