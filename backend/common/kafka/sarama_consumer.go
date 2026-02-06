@@ -8,12 +8,13 @@ import (
 )
 
 type SaramaConsumer struct {
+	name    string
 	group   sarama.ConsumerGroup
 	topic   string
 	handler sarama.ConsumerGroupHandler
 }
 
-func NewSaramaConsumer(brokerUrl []string, groupId string, topic string, handler sarama.ConsumerGroupHandler) (*SaramaConsumer, error) {
+func NewSaramaConsumer(name string, brokerUrl []string, groupId string, topic string, handler sarama.ConsumerGroupHandler) (*SaramaConsumer, error) {
 	cfg := sarama.NewConfig()
 	cfg.Version = sarama.V2_1_0_0
 	cfg.Consumer.Offsets.Initial = sarama.OffsetNewest
@@ -24,6 +25,7 @@ func NewSaramaConsumer(brokerUrl []string, groupId string, topic string, handler
 	}
 
 	return &SaramaConsumer{
+		name:    name,
 		group:   group,
 		topic:   topic,
 		handler: handler,
@@ -31,9 +33,10 @@ func NewSaramaConsumer(brokerUrl []string, groupId string, topic string, handler
 }
 
 func (c *SaramaConsumer) Start(ctx context.Context) error {
+	log.Println("starting consumer:", c.name)
 	for {
 		if err := c.group.Consume(ctx, []string{c.topic}, c.handler); err != nil {
-			log.Println("consumer error:", err)
+			log.Println("consumer error:", c.name, err)
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
