@@ -40,6 +40,29 @@ FROM train t
 JOIN trainSchedule ts ON t.id = ts.trainid;
 
 
+CREATE OR REPLACE FUNCTION get_available_seats(
+    p_train_id INTEGER,
+    p_travel_date DATE,
+    p_quota seat_quota
+)
+RETURNS TABLE (
+    coach_type coach_type,
+    available_seats BIGINT
+)
+LANGUAGE sql
+AS $$
+SELECT
+    coach_type,
+    COUNT(*) AS available_seats
+FROM seat_inventory
+WHERE train_id = p_train_id
+  AND travel_date = p_travel_date
+  AND quota = p_quota
+  AND status = 'AVAILABLE'
+GROUP BY coach_type
+ORDER BY coach_type;
+$$;
+
 
 -- name: GetAvailableSeats :many
 CREATE  OR REPLACE FUNCTION get_available_seats(
@@ -77,11 +100,14 @@ BEGIN
 END;
 $$;
 
--- name: GetAvailableSeatsExecute :many
+
+
+-- name: GetAvailableSeats :many
 SELECT *
 FROM get_available_seats(
-    sqlc.arg(train_id)::int,
-    sqlc.arg(travel_date)::date
+    sqlc.arg(train_id),
+    sqlc.arg(travel_date),
+    sqlc.arg(quota)
 );
 
 -- SELECT *
@@ -107,5 +133,28 @@ SELECT COUNT(*) = $1::int as all_seat_belong,
  WHERE s.id = ANY($2::int[])
   AND c.trainId = $3;
         
+
+-- below are not applied till now
+-- name: HoldSeat :exec
+UPDATE seat_inventory
+SET status = 'PENDING',
+    booking_id = $2
+WHERE seat_id = $1;
+
+-- name: ConfirmSeat :exec
+UPDATE seat_inventory
+SET status = 'CONFIRMED'
+WHERE booking_id = $1;
+
+-- name: ReleaseExpiredSeats :exec
+UPDATE seat_inventory
+SET status = 'AVAILABLE',
+    booking_id = NULL
+WHERE status = 'PENDING'
+AND booking_id IN (
+    SELECT id FROM booking
+    WHERE status = 'PENDING'
+    AND createdAt < now() - interval '5 minutes'
+);
 
 

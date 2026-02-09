@@ -171,12 +171,15 @@ ON DELETE RESTRICT;
 
 
 -- not made table till now
-CREATE TABLE passenger (
-   id serial PRIMARY KEY,
-   name text not null,
-   bookingItemId INTEGER REFERENCES bookingItem(id) on DELETE CASCADE,
-   age int not NULL,
-   createdAt TIMESTAMP not null DEFAULT now()
+CREATE TABLE booking_passenger (
+    id SERIAL PRIMARY KEY,
+    booking_id INT REFERENCES booking(id) ON DELETE CASCADE,
+    seat_id INT REFERENCES seat(id) ON DELETE RESTRICT,
+    name TEXT NOT NULL,
+    age INT NOT NULL,
+    gender TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE (booking_id, seat_id)
 );
 
 
@@ -205,6 +208,22 @@ CREATE TABLE waitlist (
     priority_level INTEGER DEFAULT 10,
     createdAt TIMESTAMP not NULL DEFAULT now(),
     updatedAt TIMESTAMP not NULL DEFAULT now()
+);
+
+-- should me moved to top
+CREATE TYPE seat_quota AS ENUM ('NORMAL', 'TATKAL');
+
+-- made for working on tatkal not implemented yet
+CREATE TABLE seat_inventory (
+    train_id INT NOT NULL,
+    travel_date DATE NOT NULL,
+    seat_id INT NOT NULL,
+    coach_type coach_type NOT NULL,
+    quota seat_quota NOT NULL,
+    status booking_status NOT NULL DEFAULT 'AVAILABLE',
+    booking_id INT NULL,
+
+    PRIMARY KEY (train_id, travel_date, seat_id)
 );
 
 

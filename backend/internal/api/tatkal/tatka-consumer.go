@@ -1,199 +1,215 @@
 package tatkal
 
-// func (h *Handler) ProcessTatkalBookingJob(ctx context.Context, data TatkalRequest, userId uuid.UUID) error {
-// 	err := h.store.ExpireOldBooking(ctx)
-// 	if err != nil {
-// 		fmt.Errorf("not able to expire old bookings")
-// 		return err
-// 	}
-// 	// check if the user have some active bookings
-// 	booking, err := h.store.GetActiveBookingByUser(ctx, pgtype.UUID{Bytes: userId, Valid: true})
-// 	if err != nil && err.Error() != "no rows in result set" {
-// 		return err
-// 	}
+import (
+	"better-uptime/common/logger"
+	"better-uptime/common/stripe"
+	"better-uptime/common/util"
+	db "better-uptime/internal/db/sqlc"
+	"context"
+	"fmt"
+	"net/http"
+	"slices"
+	"strconv"
+	"time"
 
-// 	if booking.ID != 0 {
-// 		fmt.Errorf("you already have an acting booking")
-// 	}
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
 
-// 	trainID, err := strconv.Atoi(data.trainId)
+func (h *Handler) ProcessTatkalBookingJob(ctx context.Context, data TatkalRequest, userId uuid.UUID) error {
+	err := h.store.ExpireOldBooking(ctx)
+	if err != nil {
+		fmt.Errorf("not able to expire old bookings")
+		return err
+	}
+	// check if the user have some active bookings
+	booking, err := h.store.GetActiveBookingByUser(ctx, pgtype.UUID{Bytes: userId, Valid: true})
+	if err != nil && err.Error() != "no rows in result set" {
+		return err
+	}
 
-// 	// check whether that train exists
-// 	count, err := h.store.ValidateTrain(ctx, int32(trainID))
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if count == 0 {
-// 		return fmt.Errorf("no such train exists")
-// 	}
+	if booking.ID != 0 {
+		fmt.Errorf("you already have an acting booking")
+	}
 
-// 	// parse the travelDate from request into time.Time
-// 	travelDate, err := time.Parse("2006-01-02", data.travelDate)
-// 	if err != nil {
-// 		return fmt.Errorf("not valid request")
-// 	}
-// 	logger.Debug(data.travelDate, travelDate)
-// 	// check whether that train on that scheedule exists
-// 	trainScheduleCount, err := h.store.ValidateSchedule(ctx, db.ValidateScheduleParams{
-// 		Trainid: util.ToPgInt4(int32(trainID)),
-// 		Column2: pgtype.Date{Time: travelDate, Valid: true},
-// 	})
-// 	if err != nil {
-// 		return fmt.Errorf("internal server error")
-// 	}
-// 	if trainScheduleCount == 0 {
-// 		return fmt.Errorf("no such train  schedule exists")
-// 	}
+	trainID, err := strconv.Atoi(data.trainId)
 
-// 	seatLength := len(data.passengers)
+	// check whether that train exists
+	count, err := h.store.ValidateTrain(ctx, int32(trainID))
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("no such train exists")
+	}
 
-// 	var seatIDs []int32
+	// parse the travelDate from request into time.Time
+	travelDate, err := time.Parse("2006-01-02", data.travelDate)
+	if err != nil {
+		return fmt.Errorf("not valid request")
+	}
+	logger.Debug(data.travelDate, travelDate)
+	// check whether that train on that scheedule exists
+	trainScheduleCount, err := h.store.ValidateSchedule(ctx, db.ValidateScheduleParams{
+		Trainid: util.ToPgInt4(int32(trainID)),
+		Column2: pgtype.Date{Time: travelDate, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("internal server error")
+	}
+	if trainScheduleCount == 0 {
+		return fmt.Errorf("no such train  schedule exists")
+	}
 
-// 	seatIDs, err = ValidateSeatId(data.Seats)
-// 	if err != nil {
-// 		util.ErrorJson(w, fmt.Errorf("not able to validate seats"))
-// 		return
-// 	}
+	seatLength := len(data.passengers)
 
-// 	_, err = h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
-// 		Column1: int32(seatLength),
-// 		Column2: seatIDs,
-// 	})
-// 	if err != nil {
-// 		util.ErrorJson(w, fmt.Errorf("seat does not belong to that train"))
-// 		return
-// 	}
+	var seatIDs []int32
 
-// 	// get all the available seats from that train
-// 	availableSeats, err := h.store.CurrentAvailabeSeats(ctx, db.CurrentAvailabeSeatsParams{
-// 		Column1:    seatIDs,
-// 		Trainid:    pgtype.Int4{Int32: int32(data.TrainId)},
-// 		Traveldate: pgtype.Date{Time: travelDate, Valid: true},
-// 	})
-// 	if err != nil {
-// 		util.ErrorJson(w, util.ErrInternal)
-// 		return
-// 	}
+	seatIDs, err = ValidateSeatId(data.Seats)
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("not able to validate seats"))
+		return
+	}
 
-// 	// compare all the available setas with the users'requested seats
-// 	if !slices.Equal(availableSeats, seatIDs) {
-// 		util.ErrorJson(w, fmt.Errorf("not all requested seats are available"))
-// 		return
-// 	}
+	_, err = h.store.ValidateSeatsBelongToTrain(ctx, db.ValidateSeatsBelongToTrainParams{
+		Column1: int32(seatLength),
+		Column2: seatIDs,
+	})
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("seat does not belong to that train"))
+		return
+	}
 
-// 	holdToken := uuid.New().String()
-// 	TrainId := fmt.Sprintf("%d", data.TrainId)
+	// get all the available seats from that train
+	availableSeats, err := h.store.CurrentAvailabeSeats(ctx, db.CurrentAvailabeSeatsParams{
+		Column1:    seatIDs,
+		Trainid:    pgtype.Int4{Int32: int32(data.TrainId)},
+		Traveldate: pgtype.Date{Time: travelDate, Valid: true},
+	})
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		return
+	}
 
-// 	seatIDStrs := make([]string, len(seatIDs))
-// 	for i, id := range seatIDs {
-// 		seatIDStrs[i] = fmt.Sprintf("%d", id)
-// 	}
+	// compare all the available setas with the users'requested seats
+	if !slices.Equal(availableSeats, seatIDs) {
+		util.ErrorJson(w, fmt.Errorf("not all requested seats are available"))
+		return
+	}
 
-// 	Lock, err := h.TrySeatLock(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken, 5*time.Minute)
-// 	if err != nil {
-// 		util.ErrorJson(w, util.ErrInternal)
-// 		logger.Debug("here--6>")
-// 		return
-// 	}
+	holdToken := uuid.New().String()
+	TrainId := fmt.Sprintf("%d", data.TrainId)
 
-// 	if Lock == false {
-// 		util.ErrorJson(w, fmt.Errorf("not able to lock all the tickets"))
-// 		return
-// 	}
+	seatIDStrs := make([]string, len(seatIDs))
+	for i, id := range seatIDs {
+		seatIDStrs[i] = fmt.Sprintf("%d", id)
+	}
 
-// 	defer func() {
-// 		if err != nil {
-// 			h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
-// 		}
-// 	}()
+	Lock, err := h.TrySeatLock(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken, 5*time.Minute)
+	if err != nil {
+		util.ErrorJson(w, util.ErrInternal)
+		logger.Debug("here--6>")
+		return
+	}
 
-// 	var bookingID int32
+	if Lock == false {
+		util.ErrorJson(w, fmt.Errorf("not able to lock all the tickets"))
+		return
+	}
 
-// 	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
-// 		bookingInProcess, err := q.CreateBooking(ctx, db.CreateBookingParams{
-// 			Userid:     pgtype.UUID{Bytes: payload.UserId, Valid: true},
-// 			Trainid:    util.ToPgInt4(int32(data.TrainId)),
-// 			Traveldate: pgtype.Date{Time: travelDate, Valid: true},
-// 			Holdtoken:  pgtype.Text{String: holdToken, Valid: true},
-// 		})
-// 		if err != nil {
-// 			return fmt.Errorf("create booking: %w", err)
-// 		}
+	defer func() {
+		if err != nil {
+			h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
+		}
+	}()
 
-// 		bookingID = bookingInProcess.ID
+	var bookingID int32
 
-// 		trainScheduled, err := q.GetTrainScheduleByDay(ctx, db.GetTrainScheduleByDayParams{
-// 			Trainid: util.ToPgInt4(int32(data.TrainId)),
-// 			Column2: pgtype.Date{Time: travelDate, Valid: true},
-// 		})
-// 		if err != nil {
-// 			return fmt.Errorf("get train schedule: %w", err)
+	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+		bookingInProcess, err := q.CreateBooking(ctx, db.CreateBookingParams{
+			Userid:     pgtype.UUID{Bytes: payload.UserId, Valid: true},
+			Trainid:    util.ToPgInt4(int32(data.TrainId)),
+			Traveldate: pgtype.Date{Time: travelDate, Valid: true},
+			Holdtoken:  pgtype.Text{String: holdToken, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("create booking: %w", err)
+		}
 
-// 		}
-// 		var bookingItems []db.Bookingitem
+		bookingID = bookingInProcess.ID
 
-// 		for _, seatId := range seatIDs {
-// 			bookingItem, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
-// 				Bookingid:       util.ToPgInt4(bookingID),
-// 				Seatid:          util.ToPgInt4(seatId),
-// 				Trainscheduleid: util.ToPgInt4(trainScheduled.ID),
-// 			})
-// 			if err != nil {
-// 				return fmt.Errorf("create booking item for seat %d: %w", seatId, err)
-// 			}
-// 			bookingItems = append(bookingItems, bookingItem)
-// 		}
+		trainScheduled, err := q.GetTrainScheduleByDay(ctx, db.GetTrainScheduleByDayParams{
+			Trainid: util.ToPgInt4(int32(data.TrainId)),
+			Column2: pgtype.Date{Time: travelDate, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("get train schedule: %w", err)
 
-// 		return nil
+		}
+		var bookingItems []db.Bookingitem
 
-// 	})
+		for _, seatId := range seatIDs {
+			bookingItem, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
+				Bookingid:       util.ToPgInt4(bookingID),
+				Seatid:          util.ToPgInt4(seatId),
+				Trainscheduleid: util.ToPgInt4(trainScheduled.ID),
+			})
+			if err != nil {
+				return fmt.Errorf("create booking item for seat %d: %w", seatId, err)
+			}
+			bookingItems = append(bookingItems, bookingItem)
+		}
 
-// 	if err != nil {
-// 		// Release locks on transaction failure
-// 		h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
-// 		util.ErrorJson(w, fmt.Errorf("booking creation failed: %v", err))
-// 		return
-// 	}
+		return nil
 
-// 	var amount int32
-// 	amount = CalculateFare(int32(len(seatIDs)))
+	})
 
-// 	paymentIntent, err := stripe.StripeSession(ctx, payload.UserId.String(), strconv.Itoa(int(amount)), "seatIds:", h.config.STRIPE_SECRET_KEY, int(bookingID), holdToken)
-// 	if err != nil {
+	if err != nil {
+		// Release locks on transaction failure
+		h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
+		util.ErrorJson(w, fmt.Errorf("booking creation failed: %v", err))
+		return
+	}
 
-// 		updateErr := h.store.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
-// 			ID:     bookingID,
-// 			Status: db.BookingStatusEXPIRED,
-// 		})
-// 		if updateErr != nil {
-// 			fmt.Printf("Critical: Failed to update booking status: %v\n", updateErr)
-// 		}
-// 		lockErr := h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
-// 		if lockErr != nil {
-// 			fmt.Printf("Critical: Failed to unlock seats: %v\n", lockErr)
-// 		}
-// 		util.ErrorJson(w, fmt.Errorf("not able to create session for payment"))
-// 		return
-// 	}
+	var amount int32
+	amount = CalculateFare(int32(len(seatIDs)))
 
-// 	transactionId := paymentIntent.SessionURL.SessionID
+	paymentIntent, err := stripe.StripeSession(ctx, payload.UserId.String(), strconv.Itoa(int(amount)), "seatIds:", h.config.STRIPE_SECRET_KEY, int(bookingID), holdToken)
+	if err != nil {
 
-// 	_, err = h.store.CreatePayment(ctx, db.CreatePaymentParams{
-// 		Bookingid:     util.ToPgInt4(bookingID),
-// 		Amount:        float64(amount),
-// 		Transactionid: transactionId,
-// 	})
-// 	if err != nil {
-// 		util.ErrorJson(w, fmt.Errorf("not able to create payment for this transaction"))
-// 		return
-// 	}
+		updateErr := h.store.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+			ID:     bookingID,
+			Status: db.BookingStatusEXPIRED,
+		})
+		if updateErr != nil {
+			fmt.Printf("Critical: Failed to update booking status: %v\n", updateErr)
+		}
+		lockErr := h.ReleaseLocks(ctx, TrainId, data.TravelDate, seatIDStrs, holdToken)
+		if lockErr != nil {
+			fmt.Printf("Critical: Failed to unlock seats: %v\n", lockErr)
+		}
+		util.ErrorJson(w, fmt.Errorf("not able to create session for payment"))
+		return
+	}
 
-// 	response := map[string]interface{}{
-// 		"bookingId":      bookingID,
-// 		"hold_token":     holdToken,
-// 		"redirected_url": paymentIntent.SessionURL.SessionURL,
-// 	}
+	transactionId := paymentIntent.SessionURL.SessionID
 
-// 	util.WriteJson(w, http.StatusAccepted, response)
+	_, err = h.store.CreatePayment(ctx, db.CreatePaymentParams{
+		Bookingid:     util.ToPgInt4(bookingID),
+		Amount:        float64(amount),
+		Transactionid: transactionId,
+	})
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("not able to create payment for this transaction"))
+		return
+	}
 
-// }
+	response := map[string]interface{}{
+		"bookingId":      bookingID,
+		"hold_token":     holdToken,
+		"redirected_url": paymentIntent.SessionURL.SessionURL,
+	}
+
+	util.WriteJson(w, http.StatusAccepted, response)
+
+}
