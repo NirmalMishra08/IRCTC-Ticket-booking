@@ -50,6 +50,15 @@ CREATE TYPE refund_status AS ENUM (
     'SUCCESS'
 );
 
+CREATE TYPE seat_status AS ENUM (
+  'AVAILABLE',
+  'HELD',
+  'CONFIRMED'
+);
+
+CREATE TYPE journey_status AS ENUM ('OPEN','CHARTED','CANCELLED');
+
+
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fullname TEXT NOT NULL,
@@ -72,8 +81,8 @@ CREATE TABLE train (
     destination TEXT NOT NULL,
     CONSTRAINT unique_train_service UNIQUE (trainNumber)
 );
-
-CREATE TABLE trainSchedule (
+ -- things are changingn here
+CREATE TABLE train_schedule (
     id  SERIAL PRIMARY KEY,
     trainId INTEGER REFERENCES train(id) ON DELETE CASCADE,
     day day_of_week NOT NULL,
@@ -81,33 +90,6 @@ CREATE TABLE trainSchedule (
     departureTime TIMESTAMPTZ NOT NULL,
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
-
-
--- i have changed the tatkal schema
-
-CREATE Table tatkal_config (
-    id SERIAL PRIMARY KEY,
-    train_id INTEGER REFERENCES train(id) ON Delete CASCADE,
-    coachType coach_type NOT NULL,
-    tatkal_start_time TIMESTAMP NOT NULL,
-    tatkal_end_time TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    UNIQUE(train_id, coach_type)
-);
-
-CREATE TABLE tatkal_waitlist (
-    id SERIAL PRIMARY KEY,
-    user_id UUID REFERENCES users(id) not null,
-    train_id INT REFERENCES train(id),
-    coach_type coach_type NOT NULL,
-    travel_date DATE NOT NULL,
-    wl_position INT NOT NULL,
-    status TEXT DEFAULT 'WAITING',
-    created_at TIMESTAMP DEFAULT now(),
-    UNIQUE(user_id, train_id, travel_date)
-);
-
 
 CREATE TABLE coach (
    id SERIAL PRIMARY KEY,
@@ -125,40 +107,84 @@ CREATE TABLE seat (
     berth  berth_type NOT NULL
 );
 
-CREATE Table payment (
-    id  SERIAL PRIMARY KEY ,
-    bookingId  INTEGER,
-    amount   FLOAT NOT NULL,
+CREATE TABLE train_journey (
+    id SERIAL PRIMARY KEY,
+    train_id INT REFERENCES train(id),
+    journey_date DATE NOT NULL,
+    schedule_id INT REFERENCES train_schedule(id),
+    status journey_status DEFAULT 'OPEN',
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE(train_id, journey_date)
+);
+
+
+
+
+CREATE TYPE seat_quota AS ENUM ('NORMAL', 'TATKAL');
+
+-- made for working on tatkal not implemented yet
+CREATE TABLE seat_inventory (
+  journey_id INT REFERENCES train_journey(id),
+  seat_id INT REFERENCES seat(id),
+  coach_type coach_type NOT NULL,
+  quota seat_quota NOT NULL,
+  status seat_status NOT NULL DEFAULT 'AVAILABLE',
+  booking_id INT REFERENCES booking(id) ON DELETE SET NULL,
+  PRIMARY KEY (journey_id, seat_id)
+);
+
+-- i have changed the tatkal schema
+
+CREATE Table tatkal_config (
+    id SERIAL PRIMARY KEY,
+    train_id INTEGER REFERENCES train(id) ON Delete CASCADE,
+    coachType coach_type NOT NULL,
+    tatkal_start_time TIMESTAMP NOT NULL,
+    tatkal_end_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    UNIQUE(train_id, coach_type)
+);
+
+CREATE TABLE tatkal_waitlist (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id) not null,
+    coach_type coach_type NOT NULL,
+    journey_id INT REFERENCES train_journey(id),
+    wl_position INT NOT NULL,
+    status waiting_status DEFAULT 'WAITING',
+    created_at TIMESTAMP DEFAULT now(),
+   UNIQUE(user_id, journey_id)
+);
+
+
+
+
+CREATE TABLE payment (
+    id SERIAL PRIMARY KEY,
+    bookingId INT REFERENCES booking(id) ON DELETE RESTRICT,
+    amount FLOAT NOT NULL,
     status payment_status DEFAULT 'PENDING',
     transactionId TEXT NOT NULL,
-    createdAt TIMESTAMP NOT NULL DEFAULT now()
+    createdAt TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE booking (
     id SERIAL PRIMARY KEY,
     userId UUID REFERENCES users(id) ON DELETE RESTRICT,
-    trainId INTEGER REFERENCES train(id) ON DELETE RESTRICT,
-    travelDate DATE NOT NULL,
+    journey_id INT REFERENCES train_journey(id) ON DELETE RESTRICT,
+    booking_type booking_type NOT NULL DEFAULT 'NORMAL',
     status booking_status NOT NULL DEFAULT 'PENDING',
     holdToken TEXT UNIQUE,
-    paymentId INTEGER REFERENCES payment(id) ON DELETE RESTRICT,
     createdAt TIMESTAMP NOT NULL DEFAULT now()
-
 );
-
-
-
-
-ALTER TABLE booking
-ADD COLUMN booking_type TEXT DEFAULT 'NORMAL';
-
 
 CREATE TABLE bookingItem (
     id SERIAL PRIMARY KEY,
-    bookingId  INTEGER REFERENCES booking(id) ON DELETE CASCADE,
+    bookingId INT REFERENCES booking(id) ON DELETE CASCADE,
     seatId INT REFERENCES seat(id) ON DELETE RESTRICT,
     bookingStatus booking_status NOT NULL DEFAULT 'PENDING',
-    trainScheduleId INTEGER REFERENCES trainSchedule(id) ON DELETE RESTRICT
+    UNIQUE (bookingId, seatId)
 );
 
 
@@ -194,15 +220,10 @@ CREATE TABLE Refund (
 
 );
 
-CREATE UNIQUE INDEX unique_confirmed_seat_per_schedule
-ON bookingItem (seatId, trainScheduleId)
-WHERE bookingStatus = 'CONFIRMED';
-
-
 CREATE TABLE waitlist (
     id SERIAL PRIMARY KEY,
-    trainscheduleid INTEGER REFERENCES trainSchedule(id) on delete RESTRICT,
-    bookingId INTEGER REFERENCES booking(id) on delete cascade,
+    journey_id INT REFERENCES train_journey(id),
+    bookingId INT REFERENCES booking(id),
     waitlist_number INTEGER not NULL,
     status  waiting_status NOT NULL DEFAULT 'WAITING',
     priority_level INTEGER DEFAULT 10,
@@ -211,20 +232,7 @@ CREATE TABLE waitlist (
 );
 
 -- should me moved to top
-CREATE TYPE seat_quota AS ENUM ('NORMAL', 'TATKAL');
 
--- made for working on tatkal not implemented yet
-CREATE TABLE seat_inventory (
-    train_id INT NOT NULL,
-    travel_date DATE NOT NULL,
-    seat_id INT NOT NULL,
-    coach_type coach_type NOT NULL,
-    quota seat_quota NOT NULL,
-    status booking_status NOT NULL DEFAULT 'AVAILABLE',
-    booking_id INT NULL,
-
-    PRIMARY KEY (train_id, travel_date, seat_id)
-);
 
 
 
@@ -234,7 +242,13 @@ CREATE INDEX idx_train_src ON train(source);
 CREATE INDEX idx_train_dest ON train(destination);
 
 CREATE INDEX idx_booking_user ON booking(userId);
-CREATE INDEX idx_booking_train_date ON booking(trainId, travelDate);
 CREATE INDEX idx_booking_status ON booking(status);
 CREATE INDEX idx_payment_status ON payment(status);
-CREATE INDEX idx_bookingitem_schedule ON bookingItem(trainScheduleId);
+CREATE INDEX idx_booking_journey ON booking(journey_id);
+CREATE INDEX idx_inventory_search
+ON seat_inventory (journey_id, coach_type, quota, status);
+
+CREATE INDEX idx_inventory_booking
+ON seat_inventory (booking_id);
+
+
