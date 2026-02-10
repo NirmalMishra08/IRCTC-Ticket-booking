@@ -1,11 +1,11 @@
 -- name: CreateBooking :one
-INSERT INTO booking (userId, trainId, travelDate, status, holdToken)
-VALUES ($1, $2, $3, 'PENDING', $4)
+INSERT INTO booking (userId, journey_id, booking_type, status, holdToken)
+VALUES ($1, $2, 'NORMAL', 'PENDING', $3)
 RETURNING *;
 
 -- name: CreateBookingItem :one
-INSERT INTO bookingItem (bookingId, seatId, trainScheduleId)
-VALUES ($1, $2, $3)
+INSERT INTO bookingItem (bookingId, seatId)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: UpdateBookingStatus :exec
@@ -17,12 +17,12 @@ WHERE id = $1;
 SELECT * FROM booking WHERE holdToken = $1;
 
 -- name: GetBookedSeats :many
-SELECT bi.seatId
-FROM bookingItem bi
-JOIN booking b on bi.bookingId = b.id
- WHERE b.trainId = $1 AND
-  b.travelDate = $2
-  AND b.status IN('PENDING','CONFIRMED');
+SELECT si.seat_id
+FROM seat_inventory si
+JOIN booking b ON si.booking_id = b.id
+WHERE b.journey_id = $1
+  AND si.status IN ('HELD','CONFIRMED');
+
 
 -- name: GetBookingbyUserId :many
 SELECT bi.* , b.*
@@ -36,14 +36,15 @@ SELECT *
 FROM booking
 WHERE userid = $1
   AND status = 'PENDING'
-  AND createdat > now() - INTERVAL '10 minutes'
+  AND createdAt > now() - INTERVAL '10 minutes'
+ORDER BY createdAt DESC
 LIMIT 1;
 
 -- name: ExpireOldBooking :exec
 UPDATE booking
 SET status='EXPIRED'
  WHERE status='PENDING'
-   AND createdat > now() - INTERVAL '10 minutes';
+   AND createdat < now() - INTERVAL '10 minutes';
 
 
 -- name: GetBookingItemsByBooking :many
@@ -57,32 +58,18 @@ DELETE FROM bookingItem WHERE bookingId = $1;
 -- name: CountActiveBookingByTrain :one
 SELECT COUNT(*)
 FROM booking
-WHERE trainId = $1
-     AND travelDate = $2
-     AND status = 'PENDING';
+WHERE journey_id = $1
+  AND status = 'PENDING';
 
--- name: CurrentAvailabeSeats :many
-SELECT s.id
-FROM seat s WHERE
-s.id = ANY($1 :: int[])
- AND NOT EXISTS (
-   SELECT 1 FROM
-   bookingItem bi
-   JOIN booking b ON bi.bookingId = b.id
-   WHERE bi.seatId = s.id
-   AND b.status  IN('PENDING','CONFIRMED')
-   AND b.trainId = $2
-   AND b.travelDate = $3
- );
 
- CREATE Table payment (
-    id  SERIAL PRIMARY KEY ,
-    bookingId  INTEGER,
-    amount   FLOAT NOT NULL,
-    status payment_status DEFAULT 'PENDING',
-    transactionId TEXT NOT NULL,
-    createdAt TIMESTAMP NOT NULL DEFAULT now()
-);
+-- name: CurrentAvailableSeats :many
+SELECT seat_id
+FROM seat_inventory
+WHERE journey_id = $1
+  AND status = 'AVAILABLE'
+  AND seat_id = ANY($2::int[]);
+
+
 
 -- name: CreatePayment :one
  INSERT into payment (bookingId,amount,transactionId)
@@ -97,12 +84,11 @@ UPDATE payment SET status = $2 WHERE bookingId = $1;
 
 -- name: GetBookingLockContext :many
 SELECT
-    b.trainId,
-    b.travelDate,
-    bi.seatId,
+    b.journey_id,
+    si.seat_id,
     b.holdToken
 FROM booking b
-JOIN bookingItem bi ON bi.bookingId = b.id
+JOIN seat_inventory si ON si.booking_id = b.id
 WHERE b.id = $1;
 
 -- name: DeleteBookingItem :exec

@@ -12,7 +12,7 @@ import (
 )
 
 const getTatkaData = `-- name: GetTatkaData :one
-SELECT id, train_id, coachtype, tatkal_start_time, tatkal_end_time, created_at, updated_at from 
+SELECT id, train_id, coach_type, tatkal_start_time, tatkal_end_time, created_at, updated_at from 
 tatkal_config
 where train_id = $1
 `
@@ -23,7 +23,7 @@ func (q *Queries) GetTatkaData(ctx context.Context, trainID pgtype.Int4) (Tatkal
 	err := row.Scan(
 		&i.ID,
 		&i.TrainID,
-		&i.Coachtype,
+		&i.CoachType,
 		&i.TatkalStartTime,
 		&i.TatkalEndTime,
 		&i.CreatedAt,

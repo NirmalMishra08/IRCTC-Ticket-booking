@@ -14,79 +14,63 @@ import (
 const countActiveBookingByTrain = `-- name: CountActiveBookingByTrain :one
 SELECT COUNT(*)
 FROM booking
-WHERE trainId = $1
-     AND travelDate = $2
-     AND status = 'PENDING'
+WHERE journey_id = $1
+  AND status = 'PENDING'
 `
 
-type CountActiveBookingByTrainParams struct {
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
-}
-
-func (q *Queries) CountActiveBookingByTrain(ctx context.Context, arg CountActiveBookingByTrainParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveBookingByTrain, arg.Trainid, arg.Traveldate)
+func (q *Queries) CountActiveBookingByTrain(ctx context.Context, journeyID pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveBookingByTrain, journeyID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createBooking = `-- name: CreateBooking :one
-INSERT INTO booking (userId, trainId, travelDate, status, holdToken)
-VALUES ($1, $2, $3, 'PENDING', $4)
-RETURNING id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type
+INSERT INTO booking (userId, journey_id, booking_type, status, holdToken)
+VALUES ($1, $2, 'NORMAL', 'PENDING', $3)
+RETURNING id, userid, journey_id, booking_type, status, holdtoken, createdat
 `
 
 type CreateBookingParams struct {
-	Userid     pgtype.UUID `json:"userid"`
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
-	Holdtoken  pgtype.Text `json:"holdtoken"`
+	Userid    pgtype.UUID `json:"userid"`
+	JourneyID pgtype.Int4 `json:"journey_id"`
+	Holdtoken pgtype.Text `json:"holdtoken"`
 }
 
 func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error) {
-	row := q.db.QueryRow(ctx, createBooking,
-		arg.Userid,
-		arg.Trainid,
-		arg.Traveldate,
-		arg.Holdtoken,
-	)
+	row := q.db.QueryRow(ctx, createBooking, arg.Userid, arg.JourneyID, arg.Holdtoken)
 	var i Booking
 	err := row.Scan(
 		&i.ID,
 		&i.Userid,
-		&i.Trainid,
-		&i.Traveldate,
+		&i.JourneyID,
+		&i.BookingType,
 		&i.Status,
 		&i.Holdtoken,
-		&i.Paymentid,
 		&i.Createdat,
-		&i.BookingType,
 	)
 	return i, err
 }
 
 const createBookingItem = `-- name: CreateBookingItem :one
-INSERT INTO bookingItem (bookingId, seatId, trainScheduleId)
-VALUES ($1, $2, $3)
-RETURNING id, bookingid, seatid, bookingstatus, trainscheduleid
+INSERT INTO bookingItem (bookingId, seatId)
+VALUES ($1, $2)
+RETURNING id, bookingid, seatid, bookingstatus
 `
 
 type CreateBookingItemParams struct {
-	Bookingid       pgtype.Int4 `json:"bookingid"`
-	Seatid          pgtype.Int4 `json:"seatid"`
-	Trainscheduleid pgtype.Int4 `json:"trainscheduleid"`
+	Bookingid pgtype.Int4 `json:"bookingid"`
+	Seatid    pgtype.Int4 `json:"seatid"`
 }
 
 func (q *Queries) CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error) {
-	row := q.db.QueryRow(ctx, createBookingItem, arg.Bookingid, arg.Seatid, arg.Trainscheduleid)
+	row := q.db.QueryRow(ctx, createBookingItem, arg.Bookingid, arg.Seatid)
 	var i Bookingitem
 	err := row.Scan(
 		&i.ID,
 		&i.Bookingid,
 		&i.Seatid,
 		&i.Bookingstatus,
-		&i.Trainscheduleid,
 	)
 	return i, err
 }
@@ -117,40 +101,32 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 	return i, err
 }
 
-const currentAvailabeSeats = `-- name: CurrentAvailabeSeats :many
-SELECT s.id
-FROM seat s WHERE
-s.id = ANY($1 :: int[])
- AND NOT EXISTS (
-   SELECT 1 FROM
-   bookingItem bi
-   JOIN booking b ON bi.bookingId = b.id
-   WHERE bi.seatId = s.id
-   AND b.status  IN('PENDING','CONFIRMED')
-   AND b.trainId = $2
-   AND b.travelDate = $3
- )
+const currentAvailableSeats = `-- name: CurrentAvailableSeats :many
+SELECT seat_id
+FROM seat_inventory
+WHERE journey_id = $1
+  AND status = 'AVAILABLE'
+  AND seat_id = ANY($2::int[])
 `
 
-type CurrentAvailabeSeatsParams struct {
-	Column1    []int32     `json:"column_1"`
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
+type CurrentAvailableSeatsParams struct {
+	JourneyID int32   `json:"journey_id"`
+	Column2   []int32 `json:"column_2"`
 }
 
-func (q *Queries) CurrentAvailabeSeats(ctx context.Context, arg CurrentAvailabeSeatsParams) ([]int32, error) {
-	rows, err := q.db.Query(ctx, currentAvailabeSeats, arg.Column1, arg.Trainid, arg.Traveldate)
+func (q *Queries) CurrentAvailableSeats(ctx context.Context, arg CurrentAvailableSeatsParams) ([]int32, error) {
+	rows, err := q.db.Query(ctx, currentAvailableSeats, arg.JourneyID, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	items := []int32{}
 	for rows.Next() {
-		var id int32
-		if err := rows.Scan(&id); err != nil {
+		var seat_id int32
+		if err := rows.Scan(&seat_id); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, seat_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -181,7 +157,7 @@ const expireOldBooking = `-- name: ExpireOldBooking :exec
 UPDATE booking
 SET status='EXPIRED'
  WHERE status='PENDING'
-   AND createdat > now() - INTERVAL '10 minutes'
+   AND createdat < now() - INTERVAL '10 minutes'
 `
 
 func (q *Queries) ExpireOldBooking(ctx context.Context) error {
@@ -190,11 +166,12 @@ func (q *Queries) ExpireOldBooking(ctx context.Context) error {
 }
 
 const getActiveBookingByUser = `-- name: GetActiveBookingByUser :one
-SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type
+SELECT id, userid, journey_id, booking_type, status, holdtoken, createdat
 FROM booking
 WHERE userid = $1
   AND status = 'PENDING'
-  AND createdat > now() - INTERVAL '10 minutes'
+  AND createdAt > now() - INTERVAL '10 minutes'
+ORDER BY createdAt DESC
 LIMIT 1
 `
 
@@ -204,44 +181,36 @@ func (q *Queries) GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID
 	err := row.Scan(
 		&i.ID,
 		&i.Userid,
-		&i.Trainid,
-		&i.Traveldate,
+		&i.JourneyID,
+		&i.BookingType,
 		&i.Status,
 		&i.Holdtoken,
-		&i.Paymentid,
 		&i.Createdat,
-		&i.BookingType,
 	)
 	return i, err
 }
 
 const getBookedSeats = `-- name: GetBookedSeats :many
-SELECT bi.seatId
-FROM bookingItem bi
-JOIN booking b on bi.bookingId = b.id
- WHERE b.trainId = $1 AND
-  b.travelDate = $2
-  AND b.status IN('PENDING','CONFIRMED')
+SELECT si.seat_id
+FROM seat_inventory si
+JOIN booking b ON si.booking_id = b.id
+WHERE b.journey_id = $1
+  AND si.status IN ('HELD','CONFIRMED')
 `
 
-type GetBookedSeatsParams struct {
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
-}
-
-func (q *Queries) GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error) {
-	rows, err := q.db.Query(ctx, getBookedSeats, arg.Trainid, arg.Traveldate)
+func (q *Queries) GetBookedSeats(ctx context.Context, journeyID pgtype.Int4) ([]int32, error) {
+	rows, err := q.db.Query(ctx, getBookedSeats, journeyID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []pgtype.Int4{}
+	items := []int32{}
 	for rows.Next() {
-		var seatid pgtype.Int4
-		if err := rows.Scan(&seatid); err != nil {
+		var seat_id int32
+		if err := rows.Scan(&seat_id); err != nil {
 			return nil, err
 		}
-		items = append(items, seatid)
+		items = append(items, seat_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -250,7 +219,7 @@ func (q *Queries) GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) 
 }
 
 const getBookingByHoldToken = `-- name: GetBookingByHoldToken :one
-SELECT id, userid, trainid, traveldate, status, holdtoken, paymentid, createdat, booking_type FROM booking WHERE holdToken = $1
+SELECT id, userid, journey_id, booking_type, status, holdtoken, createdat FROM booking WHERE holdToken = $1
 `
 
 func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error) {
@@ -259,13 +228,11 @@ func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Te
 	err := row.Scan(
 		&i.ID,
 		&i.Userid,
-		&i.Trainid,
-		&i.Traveldate,
+		&i.JourneyID,
+		&i.BookingType,
 		&i.Status,
 		&i.Holdtoken,
-		&i.Paymentid,
 		&i.Createdat,
-		&i.BookingType,
 	)
 	return i, err
 }
@@ -296,20 +263,18 @@ func (q *Queries) GetBookingItemsByBooking(ctx context.Context, bookingid pgtype
 
 const getBookingLockContext = `-- name: GetBookingLockContext :many
 SELECT
-    b.trainId,
-    b.travelDate,
-    bi.seatId,
+    b.journey_id,
+    si.seat_id,
     b.holdToken
 FROM booking b
-JOIN bookingItem bi ON bi.bookingId = b.id
+JOIN seat_inventory si ON si.booking_id = b.id
 WHERE b.id = $1
 `
 
 type GetBookingLockContextRow struct {
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
-	Seatid     pgtype.Int4 `json:"seatid"`
-	Holdtoken  pgtype.Text `json:"holdtoken"`
+	JourneyID pgtype.Int4 `json:"journey_id"`
+	SeatID    int32       `json:"seat_id"`
+	Holdtoken pgtype.Text `json:"holdtoken"`
 }
 
 func (q *Queries) GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error) {
@@ -321,12 +286,7 @@ func (q *Queries) GetBookingLockContext(ctx context.Context, id int32) ([]GetBoo
 	items := []GetBookingLockContextRow{}
 	for rows.Next() {
 		var i GetBookingLockContextRow
-		if err := rows.Scan(
-			&i.Trainid,
-			&i.Traveldate,
-			&i.Seatid,
-			&i.Holdtoken,
-		); err != nil {
+		if err := rows.Scan(&i.JourneyID, &i.SeatID, &i.Holdtoken); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -338,7 +298,7 @@ func (q *Queries) GetBookingLockContext(ctx context.Context, id int32) ([]GetBoo
 }
 
 const getBookingbyUserId = `-- name: GetBookingbyUserId :many
-SELECT bi.id, bi.bookingid, bi.seatid, bi.bookingstatus, bi.trainscheduleid , b.id, b.userid, b.trainid, b.traveldate, b.status, b.holdtoken, b.paymentid, b.createdat, b.booking_type
+SELECT bi.id, bi.bookingid, bi.seatid, bi.bookingstatus , b.id, b.userid, b.journey_id, b.booking_type, b.status, b.holdtoken, b.createdat
 FROM booking b 
 JOIN bookingItem bi 
 ON b.id = bi.bookingId
@@ -346,20 +306,17 @@ WHERE b.userId = $1
 `
 
 type GetBookingbyUserIdRow struct {
-	ID              int32            `json:"id"`
-	Bookingid       pgtype.Int4      `json:"bookingid"`
-	Seatid          pgtype.Int4      `json:"seatid"`
-	Bookingstatus   BookingStatus    `json:"bookingstatus"`
-	Trainscheduleid pgtype.Int4      `json:"trainscheduleid"`
-	ID_2            int32            `json:"id_2"`
-	Userid          pgtype.UUID      `json:"userid"`
-	Trainid         pgtype.Int4      `json:"trainid"`
-	Traveldate      pgtype.Date      `json:"traveldate"`
-	Status          BookingStatus    `json:"status"`
-	Holdtoken       pgtype.Text      `json:"holdtoken"`
-	Paymentid       pgtype.Int4      `json:"paymentid"`
-	Createdat       pgtype.Timestamp `json:"createdat"`
-	BookingType     pgtype.Text      `json:"booking_type"`
+	ID            int32            `json:"id"`
+	Bookingid     pgtype.Int4      `json:"bookingid"`
+	Seatid        pgtype.Int4      `json:"seatid"`
+	Bookingstatus BookingStatus    `json:"bookingstatus"`
+	ID_2          int32            `json:"id_2"`
+	Userid        pgtype.UUID      `json:"userid"`
+	JourneyID     pgtype.Int4      `json:"journey_id"`
+	BookingType   BookingType      `json:"booking_type"`
+	Status        BookingStatus    `json:"status"`
+	Holdtoken     pgtype.Text      `json:"holdtoken"`
+	Createdat     pgtype.Timestamp `json:"createdat"`
 }
 
 func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error) {
@@ -376,16 +333,13 @@ func (q *Queries) GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([
 			&i.Bookingid,
 			&i.Seatid,
 			&i.Bookingstatus,
-			&i.Trainscheduleid,
 			&i.ID_2,
 			&i.Userid,
-			&i.Trainid,
-			&i.Traveldate,
+			&i.JourneyID,
+			&i.BookingType,
 			&i.Status,
 			&i.Holdtoken,
-			&i.Paymentid,
 			&i.Createdat,
-			&i.BookingType,
 		); err != nil {
 			return nil, err
 		}
