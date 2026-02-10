@@ -46,29 +46,6 @@ FROM train t
 JOIN train_schedule ts ON t.id = ts.trainid;
 
 
-CREATE OR REPLACE FUNCTION get_available_seats(
-    p_train_id INTEGER,
-    p_travel_date DATE,
-    p_quota seat_quota
-)
-RETURNS TABLE (
-    coach_type coach_type,
-    available_seats BIGINT
-)
-LANGUAGE sql
-AS $$
-SELECT
-    coach_type,
-    COUNT(*) AS available_seats
-FROM seat_inventory
-WHERE train_id = p_train_id
-  AND travel_date = p_travel_date
-  AND quota = p_quota
-  AND status = 'AVAILABLE'
-GROUP BY coach_type
-ORDER BY coach_type;
-$$;
-
 
 -- name: GetAvailableSeats :many
 SELECT
@@ -122,7 +99,8 @@ WHERE journey_id = $1
 -- name: ConfirmSeat :exec
 UPDATE seat_inventory
 SET status = 'CONFIRMED'
-WHERE booking_id = $1;
+WHERE booking_id = $1
+AND status = 'HELD';
 
 
 -- name: ReleaseExpiredSeats :exec
