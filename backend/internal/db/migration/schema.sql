@@ -9,9 +9,6 @@ CREATE TYPE provider as ENUM (
     'PASSWORD'
 );
 
-
-
-
 CREATE TYPE day_of_week AS ENUM ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT','SUN');
 
 CREATE type coach_type as ENUM ('3A','2A','1A','SL','GN');
@@ -138,7 +135,7 @@ CREATE TABLE seat_inventory (
 CREATE Table tatkal_config (
     id SERIAL PRIMARY KEY,
     train_id INTEGER REFERENCES train(id) ON Delete CASCADE,
-    coachType coach_type NOT NULL,
+    coach_type coach_type NOT NULL,
     tatkal_start_time TIMESTAMP NOT NULL,
     tatkal_end_time TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT now(),
