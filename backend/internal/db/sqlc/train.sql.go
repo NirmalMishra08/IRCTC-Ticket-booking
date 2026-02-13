@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -139,8 +138,8 @@ RETURNING id, trainid, day, arrivaltime, departuretime
 type CreateTrainScheduleParams struct {
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   time.Time   `json:"arrivaltime"`
-	Departuretime time.Time   `json:"departuretime"`
+	Arrivaltime   pgtype.Time `json:"arrivaltime"`
+	Departuretime pgtype.Time `json:"departuretime"`
 }
 
 func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (TrainSchedule, error) {
@@ -176,8 +175,8 @@ type GetAllTrainRow struct {
 	ID_2          int32       `json:"id_2"`
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   time.Time   `json:"arrivaltime"`
-	Departuretime time.Time   `json:"departuretime"`
+	Arrivaltime   pgtype.Time `json:"arrivaltime"`
+	Departuretime pgtype.Time `json:"departuretime"`
 }
 
 func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
@@ -291,6 +290,20 @@ func (q *Queries) GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const getNextCoachNumber = `-- name: GetNextCoachNumber :one
+SELECT COALESCE(MAX(coachNumber), 0) + 1
+FROM coach
+WHERE trainId = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error) {
+	row := q.db.QueryRow(ctx, getNextCoachNumber, trainid)
+	var column_1 int
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getSeatsByCoach = `-- name: GetSeatsByCoach :many
@@ -417,6 +430,19 @@ type HoldSeatParams struct {
 func (q *Queries) HoldSeat(ctx context.Context, arg HoldSeatParams) error {
 	_, err := q.db.Exec(ctx, holdSeat, arg.JourneyID, arg.SeatID, arg.BookingID)
 	return err
+}
+
+const lockTrainForLayout = `-- name: LockTrainForLayout :one
+SELECT id
+FROM train
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockTrainForLayout(ctx context.Context, id int32) (int32, error) {
+	row := q.db.QueryRow(ctx, lockTrainForLayout, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
 const releaseExpiredSeats = `-- name: ReleaseExpiredSeats :exec

@@ -7,7 +7,6 @@ package db
 import (
 	"database/sql/driver"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -688,8 +687,8 @@ type TrainSchedule struct {
 	ID            int32       `json:"id"`
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   time.Time   `json:"arrivaltime"`
-	Departuretime time.Time   `json:"departuretime"`
+	Arrivaltime   pgtype.Time `json:"arrivaltime"`
+	Departuretime pgtype.Time `json:"departuretime"`
 }
 
 type User struct {

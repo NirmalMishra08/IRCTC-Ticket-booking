@@ -114,4 +114,16 @@ AND booking_id IN (
     AND createdAt < now() - interval '5 minutes'
 );
 
+-- name: GetNextCoachNumber :one
+SELECT COALESCE(MAX(coachNumber), 0) + 1
+FROM coach
+WHERE trainId = $1
+FOR UPDATE;
+
+-- name: LockTrainForLayout :one
+SELECT id
+FROM train
+WHERE id = $1
+FOR UPDATE;
+
 

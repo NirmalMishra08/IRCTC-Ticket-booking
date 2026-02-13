@@ -37,6 +37,7 @@ type Querier interface {
 	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
+	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
 	GetTatkaData(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
@@ -46,6 +47,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	LockTrainForLayout(ctx context.Context, id int32) (int32, error)
 	ReleaseExpiredSeats(ctx context.Context) error
 	UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error

@@ -88,6 +88,12 @@ CREATE TABLE train_schedule (
     CONSTRAINT unique_train_schedule UNIQUE(trainId,day)
 );
 
+ALTER TABLE train_schedule 
+    ALTER COLUMN arrivalTime TYPE TIME,
+    ALTER COLUMN arrivalTime SET NOT NULL,
+    ALTER COLUMN departureTime TYPE TIME,
+    ALTER COLUMN departureTime SET NOT NULL;
+
 CREATE TABLE coach (
    id SERIAL PRIMARY KEY,
    trainId INTEGER REFERENCES train(id) on delete CASCADE,
