@@ -17,13 +17,13 @@ type CreateTrainRequest struct {
 	Source      string    `json:"source"`
 	Destination string    `json:"destination"`
 	Day         string    `json:"day"`
-	ArrivalTime time.Time `json:"arrival_time"`
+	ArrivalTime string `json:"arrival_time"`
 }
 
 
 type CreateTrainResponse struct {
 	Train         db.Train         `json:"train"`
-	TrainSchedule db.Trainschedule `json:"train_schedule"`
+	TrainSchedule db.TrainSchedule `json:"train_schedule"`
 }
 
 func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,11 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 
 	r.Body.Close()
 
-	arrivalGoTime := time.Time(data.ArrivalTime)
+	arrivalGoTime, err := time.Parse("15:04", data.ArrivalTime)
+	if err != nil {
+		util.ErrorJson(w, util.ErrNotValidRequest)
+		return
+	}
 
 	const stopDuration = 5 * time.Minute
 	departureTime := arrivalGoTime.Add(stopDuration)
@@ -70,8 +74,8 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 	trainSchedule, err := h.store.CreateTrainSchedule(ctx, db.CreateTrainScheduleParams{
 		Trainid:       pgtype.Int4{Int32: train.ID, Valid: true},
 		Day:           db.DayOfWeek(data.Day),
-		Arrivaltime:   arrivalGoTime,
-		Departuretime: departureTime,
+		Arrivaltime:   pgtype.Time{Microseconds: int64(arrivalGoTime.Hour()*3600000 + arrivalGoTime.Minute()*60000 + arrivalGoTime.Second()*1000000), Valid: true},
+		Departuretime: pgtype.Time{Microseconds: int64(departureTime.Hour()*3600000 + departureTime.Minute()*60000 + departureTime.Second()*1000000), Valid: true},
 	})
 	if err != nil {
 		util.ErrorJson(w, err)

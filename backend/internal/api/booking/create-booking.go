@@ -3,6 +3,7 @@ package booking
 import (
 	"better-uptime/common/logger"
 	"better-uptime/common/middleware"
+	"better-uptime/common/ratelimiter"
 	"better-uptime/common/stripe"
 	"better-uptime/common/util"
 	db "better-uptime/internal/db/sqlc"
@@ -25,9 +26,10 @@ type SeatRequest struct {
 }
 
 type bookingRequest struct {
-	TrainId    int           `json:"train_id" validate:"required"`
-	TravelDate string        `json:"travel_date" validate:"required"`
-	Seats      []SeatRequest `json:"seats" validate:"required,min=1"`
+	JourneyId int 
+	BookingType db.BookingType
+	SeatCount int
+	CoachType db.CoachType
 }
 
 type BookingResponse struct {
@@ -58,6 +60,15 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userId := payload.UserId
+
+	err = h.RateLimitUser(ctx, userId.String(), 10, 20);
+	if err != nil {
+		util.ErrorJson(w, util.ErrRateLimiting)
+		return
+	}
+
+
 	var data bookingRequest
 
 	err = util.ReadJsonAndValidate(w, r, &data)
@@ -65,6 +76,12 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
 	}
+
+	// 
+
+
+
+
 	// expire all the old bookings who are pending or cancelled
 	err = h.store.ExpireOldBooking(ctx)
 	if err != nil {

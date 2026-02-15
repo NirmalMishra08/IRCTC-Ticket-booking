@@ -130,6 +130,7 @@ var (
 	ErrUnauthorizedForAppointment            = errors.New("unauthorized to reschedule this appointment")
 	ErrTrainerNotAssigned                    = errors.New("trainer is not assigned to this membership")
 	ErrInvalidRescheduledByValue             = errors.New("invalid 'rescheduled_by' value. Must be 'CLIENT' or 'TRAINER'")
+	ErrRateLimiting                          = errors.New("too many request")
 )
 
 var CustomErrorType = map[error]int{
@@ -150,7 +151,7 @@ var CustomErrorType = map[error]int{
 	ErrInvalidUser:                           http.StatusBadRequest,
 	ErrSessionExpired:                        420, // defining 420 for when a users token doesn't exist in cache (someone else has created a new session)
 	ErrSmsUnableToSend:                       430, // defining 430 for when an SMS is unable to send
-	ErrExpiredOtp:                            429,
+	ErrRateLimiting:                          429,
 	ErrVinAlreadyPaired:                      427, // defining 427 for when a vin is already paired
 	ErrVinNotPaired:                          http.StatusBadRequest,
 	ErrFileNotFound:                          http.StatusInternalServerError,

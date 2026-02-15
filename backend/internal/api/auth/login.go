@@ -39,7 +39,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			UserId:   uuid.MustParse("0b927d97-782a-4c82-b9d2-e4e06774ed37"),
 			UID:      "0b927d97-782a-4c82-b9d2-e4e06774ed37",
 			Phone:    "9876543210",
-			Provider: "password",
+			Provider: "PASSWORD",
 		}
 	} else {
 		payload, err = firebase.VerifyFirebaseIDToken(ctx, idToken)
@@ -71,9 +71,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		phone = req.Phone
 	}
 
-	provider := req.Provider
+	provider := strings.ToUpper(req.Provider)
 	if provider == "" {
-		provider = payload.Provider // fallback to payload's provider
+		provider = strings.ToUpper(payload.Provider) // fallback to payload's provider
 	}
 
 	user, err := h.store.FindOrCreateUser(ctx, db.FindOrCreateUserParams{
