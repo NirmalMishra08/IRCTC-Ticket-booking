@@ -40,13 +40,14 @@ type Querier interface {
 	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
-	GetTatkaData(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
+	GetTrainJourneyById(ctx context.Context, id int32) (TrainJourney, error)
 	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (TrainSchedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error)
 	LockTrainForLayout(ctx context.Context, id int32) (int32, error)
 	ReleaseExpiredSeats(ctx context.Context) error
 	UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error
@@ -55,6 +56,7 @@ type Querier interface {
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
 	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
+	ValidateTatkalWindow(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
 	// SELECT *
 	// FROM get_available_seats(1, '2026-01-15');
 	ValidateTrain(ctx context.Context, id int32) (int64, error)

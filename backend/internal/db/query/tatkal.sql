@@ -1,4 +1,5 @@
--- name: GetTatkaData :one
+-- name: ValidateTatkalWindow :one
 SELECT * from 
 tatkal_config
 where train_id = $1;
+

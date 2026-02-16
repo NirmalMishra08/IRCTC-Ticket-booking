@@ -127,3 +127,18 @@ WHERE id = $1
 FOR UPDATE;
 
 
+-- name: GetTrainJourneyById :one
+select *
+from train_journey
+where id = $1;
+
+-- name: LockAvailableSeats :many
+SELECT seat_id
+FROM seat_inventory
+WHERE journey_id = sqlc.arg(journey_id)
+  AND coach_type = sqlc.arg(coach_type)
+  AND quota = sqlc.arg(quota)
+  AND status = 'AVAILABLE'
+ORDER BY seat_id
+FOR UPDATE SKIP LOCKED
+LIMIT sqlc.arg(seat_limit);

@@ -385,6 +385,26 @@ func (q *Queries) GetTrainById(ctx context.Context, id int32) (Train, error) {
 	return i, err
 }
 
+const getTrainJourneyById = `-- name: GetTrainJourneyById :one
+select id, train_id, journey_date, schedule_id, status, created_at
+from train_journey
+where id = $1
+`
+
+func (q *Queries) GetTrainJourneyById(ctx context.Context, id int32) (TrainJourney, error) {
+	row := q.db.QueryRow(ctx, getTrainJourneyById, id)
+	var i TrainJourney
+	err := row.Scan(
+		&i.ID,
+		&i.TrainID,
+		&i.JourneyDate,
+		&i.ScheduleID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getTrainScheduleByDay = `-- name: GetTrainScheduleByDay :one
 SELECT id, trainid, day, arrivaltime, departuretime
 FROM train_schedule
@@ -430,6 +450,50 @@ type HoldSeatParams struct {
 func (q *Queries) HoldSeat(ctx context.Context, arg HoldSeatParams) error {
 	_, err := q.db.Exec(ctx, holdSeat, arg.JourneyID, arg.SeatID, arg.BookingID)
 	return err
+}
+
+const lockAvailableSeats = `-- name: LockAvailableSeats :many
+SELECT seat_id
+FROM seat_inventory
+WHERE journey_id = $1
+  AND coach_type = $2
+  AND quota = $3
+  AND status = 'AVAILABLE'
+ORDER BY seat_id
+FOR UPDATE SKIP LOCKED
+LIMIT $4
+`
+
+type LockAvailableSeatsParams struct {
+	JourneyID int32     `json:"journey_id"`
+	CoachType CoachType `json:"coach_type"`
+	Quota     SeatQuota `json:"quota"`
+	SeatLimit int32     `json:"seat_limit"`
+}
+
+func (q *Queries) LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error) {
+	rows, err := q.db.Query(ctx, lockAvailableSeats,
+		arg.JourneyID,
+		arg.CoachType,
+		arg.Quota,
+		arg.SeatLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var seat_id int32
+		if err := rows.Scan(&seat_id); err != nil {
+			return nil, err
+		}
+		items = append(items, seat_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockTrainForLayout = `-- name: LockTrainForLayout :one
