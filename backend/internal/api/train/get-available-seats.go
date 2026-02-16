@@ -12,8 +12,9 @@ import (
 )
 
 type GetAvailableSeatsRequest struct {
-	TrainID    int32  `json:"train_id"`
-	TravelDate string `json:"travel_date"`
+	TrainID    int32        `json:"train_id"`
+	TravelDate string       `json:"travel_date"`
+	Quota      db.SeatQuota `json:"quota,omitempty"`
 }
 
 func (h *Handler) GetAvailableSeats(w http.ResponseWriter, r *http.Request) {
@@ -30,9 +31,10 @@ func (h *Handler) GetAvailableSeats(w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug(travelDate.String())
 
-	seats, err := h.store.GetAvailableSeatsExecute(ctx, db.GetAvailableSeatsExecuteParams{
-		TrainID:    data.TrainID,
-		TravelDate: pgtype.Date{Valid: true, Time: travelDate},
+	seats, err := h.store.GetAvailableSeats(ctx, db.GetAvailableSeatsParams{
+		TrainID:     util.ToPgInt4(data.TrainID),
+		JourneyDate: pgtype.Date{Valid: true, Time: travelDate},
+		Quota:       data.Quota,
 	})
 	if err != nil {
 		util.ErrorJson(w, err)

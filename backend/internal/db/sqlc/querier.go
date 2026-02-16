@@ -12,45 +12,51 @@ import (
 )
 
 type Querier interface {
-	CountActiveBookingByTrain(ctx context.Context, arg CountActiveBookingByTrainParams) (int64, error)
+	ConfirmSeat(ctx context.Context, bookingID pgtype.Int4) error
+	CountActiveBookingByTrain(ctx context.Context, journeyID pgtype.Int4) (int64, error)
 	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
-	CreateRefund(ctx context.Context, arg CreateRefundParams) (Refund, error)
 	CreateSeat(ctx context.Context, arg CreateSeatParams) (Seat, error)
 	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
-	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error)
+	CreateTrainJourney(ctx context.Context, arg CreateTrainJourneyParams) (TrainJourney, error)
+	CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (TrainSchedule, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	CurrentAvailabeSeats(ctx context.Context, arg CurrentAvailabeSeatsParams) ([]int32, error)
+	CurrentAvailableSeats(ctx context.Context, arg CurrentAvailableSeatsParams) ([]int32, error)
 	DeleteBookingItem(ctx context.Context, bookingid pgtype.Int4) error
 	DeleteBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) error
 	ExpireOldBooking(ctx context.Context) error
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)
 	GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID) (Booking, error)
 	GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error)
-	GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow, error)
-	GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error)
-	GetBookedSeats(ctx context.Context, arg GetBookedSeatsParams) ([]pgtype.Int4, error)
+	GetAvailableSeats(ctx context.Context, arg GetAvailableSeatsParams) ([]GetAvailableSeatsRow, error)
+	GetBookedSeats(ctx context.Context, journeyID pgtype.Int4) ([]int32, error)
 	GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error)
 	GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error)
 	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
-	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
+	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
-	GetTatkaData(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
-	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error)
+	GetTrainJourneyById(ctx context.Context, id int32) (TrainJourney, error)
+	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (TrainSchedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	// below are not applied till now
+	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error)
+	LockTrainForLayout(ctx context.Context, id int32) (int32, error)
+	ReleaseExpiredSeats(ctx context.Context) error
 	UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
 	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
 	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
+	ValidateTatkalWindow(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
 	// SELECT *
 	// FROM get_available_seats(1, '2026-01-15');
 	ValidateTrain(ctx context.Context, id int32) (int64, error)

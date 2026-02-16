@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"better-uptime/common/logger"
 	"better-uptime/common/util"
 	db "better-uptime/internal/db/sqlc"
 
@@ -23,80 +22,62 @@ func (h *Handler) CreateCoachesAndSeats(w http.ResponseWriter, r *http.Request) 
 
 	ctx := r.Context()
 
-	// Verify train exists
-	train, err := h.store.GetTrainById(ctx, int32(req.TrainID))
+	err := h.store.ExecTx(ctx, func(q *db.Queries) error {
+		_, err := q.LockTrainForLayout(ctx, int32(req.TrainID))
+		if err != nil {
+			return fmt.Errorf("failed to lock train: %w", err)
+		}
+
+		existingCoaches, err := q.GetCoachesByTrain(ctx, pgtype.Int4{
+			Int32: int32(req.TrainID),
+			Valid: true,
+		})
+		if err != nil {
+			return err
+		}
+		if len(existingCoaches) > 0 {
+			return fmt.Errorf("layout already exists for this train")
+		}
+
+		for _, config := range req.Configurations {
+
+			berthAllocation := getBerthAllocationSimple(config)
+
+			for i := 0; i < config.NumberOfCoaches; i++ {
+
+				// 🔢 Get next coach number safely
+				nextCoachNumber, err := q.GetNextCoachNumber(ctx, pgtype.Int4{
+					Int32: int32(req.TrainID),
+					Valid: true,
+				})
+				if err != nil {
+					return err
+				}
+				coach, err := q.CreateCoach(ctx, db.CreateCoachParams{
+					Trainid:     pgtype.Int4{Int32: int32(req.TrainID), Valid: true},
+					Coachtype:   db.CoachType(config.CoachType),
+					Coachnumber: int32(nextCoachNumber),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create coach: %w", err)
+				}
+				if err := createSeatsTx(ctx, q, coach.ID, berthAllocation); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		util.ErrorJson(w, fmt.Errorf("train with ID %d not found", req.TrainID))
+		util.ErrorJson(w, err)
 		return
 	}
 
-	// Check if coaches already exist
-	existingCoaches, _ := h.store.GetCoachesByTrain(ctx, pgtype.Int4{Int32: int32(req.TrainID),Valid: true})
-	if len(existingCoaches) > 0 {
-		// Optional: Delete existing coaches first
-		// Or return error asking to delete first
-		util.ErrorJson(w, fmt.Errorf("train already has %d coaches. Delete them first", len(existingCoaches)))
-		return
-	}
-
-	// Track statistics
-	totalCoaches := 0
-	totalSeats := 0
-	coachBreakdown := []CoachTypeSummary{}
-
-	// Create coaches and seats
-	for _, config := range req.Configurations {
-		// Get berth allocation for this coach type
-		berthAllocation := getBerthAllocationSimple(config)
-
-		coachSummary := CoachTypeSummary{
-			CoachType:       string(config.CoachType),
-			NumberOfCoaches: config.NumberOfCoaches,
-			SeatsPerCoach:   config.SeatsPerCoach,
-			TotalSeats:      config.NumberOfCoaches * config.SeatsPerCoach,
-		}
-		coachBreakdown = append(coachBreakdown, coachSummary)
-
-		for coachNum := 1; coachNum <= config.NumberOfCoaches; coachNum++ {
-			// Create coach
-			coach, err := h.store.CreateCoach(ctx, db.CreateCoachParams{
-				Trainid:     pgtype.Int4{Int32: int32(req.TrainID), Valid: true},
-				Coachtype:   db.CoachType(config.CoachType),
-				Coachnumber: int32(coachNum),
-			})
-			if err != nil {
-				logger.Error("Failed to create coach %d: %v", coachNum, err)
-				util.ErrorJson(w, fmt.Errorf("failed to create coach %d: %v", coachNum, err))
-				return
-			}
-			totalCoaches++
-
-			// Create seats for this coach
-			seatsCreated, err := h.createSeatsForCoachSimple(ctx, coach.ID, berthAllocation)
-			if err != nil {
-				logger.Error("Failed to create seats for coach %d: %v", coach.ID, err)
-				util.ErrorJson(w, fmt.Errorf("failed to create seats: %v", err))
-				return
-			}
-			totalSeats += seatsCreated
-
-			logger.Info("Created coach %d (type: %s, number: %d) with %d seats",
-				coach.ID, config.CoachType, coachNum, seatsCreated)
-		}
-	}
-
-	// Prepare response
-	response := CoachSeatResponse{
-		TrainID:        req.TrainID,
-		TrainNumber:    int(train.Trainnumber),
-		TrainName:      train.Trainname,
-		TotalCoaches:   totalCoaches,
-		TotalSeats:     totalSeats,
-		CoachBreakdown: coachBreakdown,
-		Message:        fmt.Sprintf("Successfully created %d coaches with %d seats", totalCoaches, totalSeats),
-	}
-
-	util.WriteJson(w, http.StatusCreated, response)
+	util.WriteJson(w, http.StatusCreated, map[string]string{
+		"message": "seats created successfully",
+	})
 }
 
 // getBerthAllocationSimple - Simple berth allocation
@@ -151,4 +132,29 @@ func (h *Handler) createSeatsForCoachSimple(ctx context.Context, coachID int32,
 	}
 
 	return totalSeatsCreated, nil
+}
+
+func createSeatsTx(
+	ctx context.Context,
+	q *db.Queries,
+	coachID int32,
+	allocations []BerthAllocation,
+) error {
+
+	seatNumber := int32(1)
+
+	for _, alloc := range allocations {
+		for i := 0; i < alloc.Count; i++ {
+			_, err := q.CreateSeat(ctx, db.CreateSeatParams{
+				Coachid: pgtype.Int4{Int32: coachID, Valid: true},
+				Seatno:  seatNumber,
+				Berth:   db.BerthType(alloc.BerthType),
+			})
+			if err != nil {
+				return err
+			}
+			seatNumber++
+		}
+	}
+	return nil
 }

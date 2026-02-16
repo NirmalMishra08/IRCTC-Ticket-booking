@@ -7,10 +7,21 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const confirmSeat = `-- name: ConfirmSeat :exec
+UPDATE seat_inventory
+SET status = 'CONFIRMED'
+WHERE booking_id = $1
+AND status = 'HELD'
+`
+
+func (q *Queries) ConfirmSeat(ctx context.Context, bookingID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, confirmSeat, bookingID)
+	return err
+}
 
 const createCoach = `-- name: CreateCoach :one
 INSERT into coach (trainId,coachtype,coachNumber) VALUES ($1 , $2 , $3) RETURNING id, trainid, coachtype, coachnumber
@@ -87,8 +98,39 @@ func (q *Queries) CreateTrain(ctx context.Context, arg CreateTrainParams) (Train
 	return i, err
 }
 
+const createTrainJourney = `-- name: CreateTrainJourney :one
+INSERT INTO train_journey (train_id , journey_date ,schedule_id, status )
+VALUES( $1 , $2 , $3 , $4) RETURNING id, train_id, journey_date, schedule_id, status, created_at
+`
+
+type CreateTrainJourneyParams struct {
+	TrainID     pgtype.Int4       `json:"train_id"`
+	JourneyDate pgtype.Date       `json:"journey_date"`
+	ScheduleID  pgtype.Int4       `json:"schedule_id"`
+	Status      NullJourneyStatus `json:"status"`
+}
+
+func (q *Queries) CreateTrainJourney(ctx context.Context, arg CreateTrainJourneyParams) (TrainJourney, error) {
+	row := q.db.QueryRow(ctx, createTrainJourney,
+		arg.TrainID,
+		arg.JourneyDate,
+		arg.ScheduleID,
+		arg.Status,
+	)
+	var i TrainJourney
+	err := row.Scan(
+		&i.ID,
+		&i.TrainID,
+		&i.JourneyDate,
+		&i.ScheduleID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createTrainSchedule = `-- name: CreateTrainSchedule :one
-INSERT into trainSchedule(trainId,day,arrivalTime,departureTime)
+INSERT into train_schedule (trainId,day,arrivalTime,departureTime)
 VALUES ( $1 ,$2 ,$3,$4) 
 RETURNING id, trainid, day, arrivaltime, departuretime
 `
@@ -96,18 +138,18 @@ RETURNING id, trainid, day, arrivaltime, departuretime
 type CreateTrainScheduleParams struct {
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   time.Time   `json:"arrivaltime"`
-	Departuretime time.Time   `json:"departuretime"`
+	Arrivaltime   pgtype.Time `json:"arrivaltime"`
+	Departuretime pgtype.Time `json:"departuretime"`
 }
 
-func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (Trainschedule, error) {
+func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (TrainSchedule, error) {
 	row := q.db.QueryRow(ctx, createTrainSchedule,
 		arg.Trainid,
 		arg.Day,
 		arg.Arrivaltime,
 		arg.Departuretime,
 	)
-	var i Trainschedule
+	var i TrainSchedule
 	err := row.Scan(
 		&i.ID,
 		&i.Trainid,
@@ -121,7 +163,7 @@ func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainSchedu
 const getAllTrain = `-- name: GetAllTrain :many
 SELECT t.id, t.trainnumber, t.trainname, t.source, t.destination , ts.id, ts.trainid, ts.day, ts.arrivaltime, ts.departuretime
 FROM train t
-JOIN trainSchedule ts ON t.id = ts.trainid
+JOIN train_schedule ts ON t.id = ts.trainid
 `
 
 type GetAllTrainRow struct {
@@ -133,8 +175,8 @@ type GetAllTrainRow struct {
 	ID_2          int32       `json:"id_2"`
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   time.Time   `json:"arrivaltime"`
-	Departuretime time.Time   `json:"departuretime"`
+	Arrivaltime   pgtype.Time `json:"arrivaltime"`
+	Departuretime pgtype.Time `json:"departuretime"`
 }
 
 func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
@@ -169,47 +211,35 @@ func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
 }
 
 const getAvailableSeats = `-- name: GetAvailableSeats :many
-CREATE  OR REPLACE FUNCTION get_available_seats(
-    p_train_id INTEGER,
-    p_travel_date DATE  -- Changed from TIME to DATE to match your schema
-)
-RETURNS TABLE (
-    coach_type coach_type,
-    total_seats BIGINT,
-    booked_seats BIGINT,
-    available_seats BIGINT
-)
-LANGUAGE plpgsql
-AS $$ 
-BEGIN 
-    RETURN QUERY 
-    SELECT c.coachtype,
-           COUNT(s.id)::BIGINT as total_seats,
-           COUNT(bi.seatId)::BIGINT as booked_seats,
-           (COUNT(s.id) - COUNT(bi.seatId))::BIGINT as available_seats
-    FROM train t 
-    JOIN coach c ON t.id = c.trainId
-    JOIN seat s ON c.id = s.coachId
-    LEFT JOIN (
-        SELECT DISTINCT bi.seatId
-        FROM booking b
-        JOIN bookingItem bi ON b.id = bi.bookingId
-        WHERE b.trainId = p_train_id
-          AND b.travelDate = p_travel_date
-          AND b.status IN ('CONFIRMED', 'PENDING')
-    ) bi ON s.id = bi.seatId
-    WHERE t.id = p_train_id
-    GROUP BY c.coachtype
-    ORDER BY c.coachtype;
-END;
-$$
+SELECT
+    si.coach_type,
+    COUNT(*) FILTER (WHERE si.status = 'AVAILABLE') AS available_seats,
+    COUNT(*) FILTER (WHERE si.status = 'CONFIRMED') AS booked_seats,
+    COUNT(*) AS total_seats
+FROM seat_inventory si
+JOIN train_journey tj ON tj.id = si.journey_id
+WHERE tj.train_id = $1
+  AND tj.journey_date = $2
+  AND si.quota = $3
+GROUP BY si.coach_type
+ORDER BY si.coach_type
 `
 
-type GetAvailableSeatsRow struct {
+type GetAvailableSeatsParams struct {
+	TrainID     pgtype.Int4 `json:"train_id"`
+	JourneyDate pgtype.Date `json:"journey_date"`
+	Quota       SeatQuota   `json:"quota"`
 }
 
-func (q *Queries) GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow, error) {
-	rows, err := q.db.Query(ctx, getAvailableSeats)
+type GetAvailableSeatsRow struct {
+	CoachType      CoachType `json:"coach_type"`
+	AvailableSeats int64     `json:"available_seats"`
+	BookedSeats    int64     `json:"booked_seats"`
+	TotalSeats     int64     `json:"total_seats"`
+}
+
+func (q *Queries) GetAvailableSeats(ctx context.Context, arg GetAvailableSeatsParams) ([]GetAvailableSeatsRow, error) {
+	rows, err := q.db.Query(ctx, getAvailableSeats, arg.TrainID, arg.JourneyDate, arg.Quota)
 	if err != nil {
 		return nil, err
 	}
@@ -217,43 +247,12 @@ func (q *Queries) GetAvailableSeats(ctx context.Context) ([]GetAvailableSeatsRow
 	items := []GetAvailableSeatsRow{}
 	for rows.Next() {
 		var i GetAvailableSeatsRow
-		if err := rows.Scan(); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getAvailableSeatsExecute = `-- name: GetAvailableSeatsExecute :many
-SELECT 
-FROM get_available_seats(
-    $1::int,
-    $2::date
-)
-`
-
-type GetAvailableSeatsExecuteParams struct {
-	TrainID    int32       `json:"train_id"`
-	TravelDate pgtype.Date `json:"travel_date"`
-}
-
-type GetAvailableSeatsExecuteRow struct {
-}
-
-func (q *Queries) GetAvailableSeatsExecute(ctx context.Context, arg GetAvailableSeatsExecuteParams) ([]GetAvailableSeatsExecuteRow, error) {
-	rows, err := q.db.Query(ctx, getAvailableSeatsExecute, arg.TrainID, arg.TravelDate)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetAvailableSeatsExecuteRow{}
-	for rows.Next() {
-		var i GetAvailableSeatsExecuteRow
-		if err := rows.Scan(); err != nil {
+		if err := rows.Scan(
+			&i.CoachType,
+			&i.AvailableSeats,
+			&i.BookedSeats,
+			&i.TotalSeats,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -291,6 +290,20 @@ func (q *Queries) GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const getNextCoachNumber = `-- name: GetNextCoachNumber :one
+SELECT COALESCE(MAX(coachNumber), 0) + 1
+FROM coach
+WHERE trainId = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error) {
+	row := q.db.QueryRow(ctx, getNextCoachNumber, trainid)
+	var column_1 int
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getSeatsByCoach = `-- name: GetSeatsByCoach :many
@@ -372,20 +385,41 @@ func (q *Queries) GetTrainById(ctx context.Context, id int32) (Train, error) {
 	return i, err
 }
 
+const getTrainJourneyById = `-- name: GetTrainJourneyById :one
+select id, train_id, journey_date, schedule_id, status, created_at
+from train_journey
+where id = $1
+`
+
+func (q *Queries) GetTrainJourneyById(ctx context.Context, id int32) (TrainJourney, error) {
+	row := q.db.QueryRow(ctx, getTrainJourneyById, id)
+	var i TrainJourney
+	err := row.Scan(
+		&i.ID,
+		&i.TrainID,
+		&i.JourneyDate,
+		&i.ScheduleID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getTrainScheduleByDay = `-- name: GetTrainScheduleByDay :one
-SELECT id, trainid, day, arrivaltime, departuretime FROM trainSchedule
-WHERE trainId = $1 
-AND arrivalTime::DATE = $2::DATE
+SELECT id, trainid, day, arrivaltime, departuretime
+FROM train_schedule
+WHERE trainId = $1
+AND day = $2
 `
 
 type GetTrainScheduleByDayParams struct {
 	Trainid pgtype.Int4 `json:"trainid"`
-	Column2 pgtype.Date `json:"column_2"`
+	Day     DayOfWeek   `json:"day"`
 }
 
-func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (Trainschedule, error) {
-	row := q.db.QueryRow(ctx, getTrainScheduleByDay, arg.Trainid, arg.Column2)
-	var i Trainschedule
+func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (TrainSchedule, error) {
+	row := q.db.QueryRow(ctx, getTrainScheduleByDay, arg.Trainid, arg.Day)
+	var i TrainSchedule
 	err := row.Scan(
 		&i.ID,
 		&i.Trainid,
@@ -396,20 +430,116 @@ func (q *Queries) GetTrainScheduleByDay(ctx context.Context, arg GetTrainSchedul
 	return i, err
 }
 
+const holdSeat = `-- name: HoldSeat :exec
+
+UPDATE seat_inventory
+SET status = 'HELD',
+    booking_id = $3
+WHERE journey_id = $1
+  AND seat_id = $2
+  AND status = 'AVAILABLE'
+`
+
+type HoldSeatParams struct {
+	JourneyID int32       `json:"journey_id"`
+	SeatID    int32       `json:"seat_id"`
+	BookingID pgtype.Int4 `json:"booking_id"`
+}
+
+// below are not applied till now
+func (q *Queries) HoldSeat(ctx context.Context, arg HoldSeatParams) error {
+	_, err := q.db.Exec(ctx, holdSeat, arg.JourneyID, arg.SeatID, arg.BookingID)
+	return err
+}
+
+const lockAvailableSeats = `-- name: LockAvailableSeats :many
+SELECT seat_id
+FROM seat_inventory
+WHERE journey_id = $1
+  AND coach_type = $2
+  AND quota = $3
+  AND status = 'AVAILABLE'
+ORDER BY seat_id
+FOR UPDATE SKIP LOCKED
+LIMIT $4
+`
+
+type LockAvailableSeatsParams struct {
+	JourneyID int32     `json:"journey_id"`
+	CoachType CoachType `json:"coach_type"`
+	Quota     SeatQuota `json:"quota"`
+	SeatLimit int32     `json:"seat_limit"`
+}
+
+func (q *Queries) LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error) {
+	rows, err := q.db.Query(ctx, lockAvailableSeats,
+		arg.JourneyID,
+		arg.CoachType,
+		arg.Quota,
+		arg.SeatLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var seat_id int32
+		if err := rows.Scan(&seat_id); err != nil {
+			return nil, err
+		}
+		items = append(items, seat_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockTrainForLayout = `-- name: LockTrainForLayout :one
+SELECT id
+FROM train
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockTrainForLayout(ctx context.Context, id int32) (int32, error) {
+	row := q.db.QueryRow(ctx, lockTrainForLayout, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
+const releaseExpiredSeats = `-- name: ReleaseExpiredSeats :exec
+UPDATE seat_inventory
+SET status = 'AVAILABLE',
+    booking_id = NULL
+WHERE status = 'HELD'
+AND booking_id IN (
+    SELECT id FROM booking
+    WHERE status = 'PENDING'
+    AND createdAt < now() - interval '5 minutes'
+)
+`
+
+func (q *Queries) ReleaseExpiredSeats(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, releaseExpiredSeats)
+	return err
+}
+
 const validateSchedule = `-- name: ValidateSchedule :one
-SELECT count(*)
-FROM trainSchedule ts
-WHERE ts.trainId = $1 
-AND (ts.arrivaltime AT TIME ZONE 'UTC')::date = $2::date
+SELECT COUNT(*)
+FROM train_schedule
+WHERE trainId = $1
+AND day = $2
 `
 
 type ValidateScheduleParams struct {
 	Trainid pgtype.Int4 `json:"trainid"`
-	Column2 pgtype.Date `json:"column_2"`
+	Day     DayOfWeek   `json:"day"`
 }
 
 func (q *Queries) ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error) {
-	row := q.db.QueryRow(ctx, validateSchedule, arg.Trainid, arg.Column2)
+	row := q.db.QueryRow(ctx, validateSchedule, arg.Trainid, arg.Day)
 	var count int64
 	err := row.Scan(&count)
 	return count, err

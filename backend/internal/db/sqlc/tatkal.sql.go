@@ -11,19 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getTatkaData = `-- name: GetTatkaData :one
-SELECT id, train_id, coachtype, tatkal_start_time, tatkal_end_time, created_at, updated_at from 
+const validateTatkalWindow = `-- name: ValidateTatkalWindow :one
+SELECT id, train_id, coach_type, tatkal_start_time, tatkal_end_time, created_at, updated_at from 
 tatkal_config
 where train_id = $1
 `
 
-func (q *Queries) GetTatkaData(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error) {
-	row := q.db.QueryRow(ctx, getTatkaData, trainID)
+func (q *Queries) ValidateTatkalWindow(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error) {
+	row := q.db.QueryRow(ctx, validateTatkalWindow, trainID)
 	var i TatkalConfig
 	err := row.Scan(
 		&i.ID,
 		&i.TrainID,
-		&i.Coachtype,
+		&i.CoachType,
 		&i.TatkalStartTime,
 		&i.TatkalEndTime,
 		&i.CreatedAt,
