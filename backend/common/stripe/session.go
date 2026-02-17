@@ -76,6 +76,7 @@ func StripeSession(ctx context.Context, userUUID, price, planName, StripeKey str
 		},
 	}
 	params.AddMetadata("api_version", "2024-05-01")
+	params.SetIdempotencyKey(fmt.Sprintf("booking_%d",bookingId))
 	s, err := session.New(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the session: %w", err)
