@@ -1,6 +1,7 @@
 package booking
 
 import (
+	"better-uptime/common/logger"
 	"better-uptime/common/middleware"
 	"better-uptime/common/stripe"
 	"better-uptime/common/util"
@@ -53,13 +54,15 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	train_journey, err := h.store.GetTrainJourneyById(ctx, int32(data.JourneyId))
-
-	if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
-		util.ErrorJson("Not opened for booking")
-	}
 	if err != nil {
 		util.ErrorJson(w, errors.New("not able to get train journey details"))
 	}
+
+	if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
+		util.ErrorJson(w, fmt.Errorf("Not opened for booking"))
+		return
+	}
+
 	// check only if the booking type is tatkal
 	if data.BookingType == "TATKAL" {
 		tatkal_data, err := h.store.ValidateTatkalWindow(ctx, util.ToPgInt4(train_journey.TrainID.Int32))
@@ -74,14 +77,21 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// createBookingIntent for getting booking id
-	booking, err := h.store.CreateBooking(ctx, db.CreateBookingParams{
-		Userid:    pgtype.UUID{Bytes: userId, Valid: true},
-		JourneyID: util.ToPgInt4(int32(data.JourneyId)),
-		Holdtoken: pgtype.Text{String: string(uuid.New().String()), Valid: true},
-	})
+	holdToken := string(uuid.New().String())
+
+	var bookingId int
 
 	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+		booking, err := q.CreateBooking(ctx, db.CreateBookingParams{
+			Userid:    pgtype.UUID{Bytes: userId, Valid: true},
+			JourneyID: util.ToPgInt4(int32(data.JourneyId)),
+			Holdtoken: pgtype.Text{String: holdToken, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("not able to book seats: %w", err)
+		}
+
+		bookingId = int(booking.ID)
 
 		seatIDs, err := q.LockAvailableSeats(ctx, db.LockAvailableSeatsParams{
 			JourneyID: int32(data.JourneyId),
@@ -122,16 +132,32 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	})
 
+	if err != nil {
+		util.ErrorJson(w, err)
+		return
+	}
+
 	amount := CalculateFare(int32(data.SeatCount), data.CoachType, data.BookingType)
 
-	paymentIntent, err := stripe.StripeSession(ctx, userId.String(), fmt.Sprintf("%d", amount), "booking_train", h.config.STRIPE_SECRET_KEY, int(booking.ID), booking.Holdtoken.String)
+	paymentIntent, err := stripe.StripeSession(ctx, userId.String(), fmt.Sprintf("%d", amount), "booking_train", h.config.STRIPE_SECRET_KEY, int(bookingId), holdToken)
 	if err != nil {
+		updateErr := h.store.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+			ID:     int32(bookingId),
+			Status: db.BookingStatusEXPIRED,
+		})
+
+		if updateErr != nil {
+			logger.Error("failed to expire booking %d: %v", bookingId, updateErr)
+		}
+
+		_ = h.store.ReleaseSeatsByBooking(ctx, util.ToPgInt4(int32(bookingId)))
+
 		util.ErrorJson(w, errors.New("not able to create booking intent"))
 		return
 	}
 
 	_, err = h.store.CreatePayment(ctx, db.CreatePaymentParams{
-		Bookingid:     util.ToPgInt4(booking.ID),
+		Bookingid:     util.ToPgInt4(int32(bookingId)),
 		Amount:        float64(amount),
 		Transactionid: paymentIntent.SessionURL.SessionID,
 	})
@@ -140,7 +166,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, fmt.Errorf("not able to create payment"))
 	}
 	response := map[string]interface{}{
-		"bookingId":  booking.ID,
+		"bookingId":  bookingId,
 		"sessionUrl": paymentIntent.SessionURL,
 		"expires_in": 600,
 	}

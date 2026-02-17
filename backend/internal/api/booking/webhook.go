@@ -45,6 +45,9 @@ func (h *Handler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 
 	case "checkout.session.expired":
 		h.handlePaymentExpired(event, ctx)
+
+	case "payment_intent.payment_failed":
+		h.handlePaymentExpired(event, ctx)
 	}
 
 	util.WriteJson(w, http.StatusOK, nil)
@@ -54,15 +57,38 @@ func (h *Handler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handlePaymentSuccess(event stripe.Event, ctx context.Context) {
 	var session stripe.CheckoutSession
 
-	json.Unmarshal(event.Data.Raw, &session)
+	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+		logger.Error("failed to parse checkout session", err)
+		return
+	}
 
-	bookingId, _ := strconv.Atoi(session.Metadata["booking_id"])
+	bookingIDStr := session.Metadata["booking_id"]
+	if bookingIDStr == "" {
+		logger.Error("missing booking_id in metadata")
+		return
+	}
+
+	bookingId, err := strconv.Atoi(bookingIDStr)
+	if err != nil {
+		logger.Error("invalid booking_id", err)
+		return
+	}
 
 	if err := h.store.ExecTx(ctx, func(q *db.Queries) error {
-		err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+		booking, err := q.GetBookingById(ctx, int32(bookingId))
+		if err != nil {
+			return err
+		}
+
+		if booking.Status == db.BookingStatusCONFIRMED {
+			return nil
+		}
+
+		err = q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
 			ID:     int32(bookingId),
 			Status: db.BookingStatusCONFIRMED,
 		})
+
 		if err != nil {
 			return err
 		}
@@ -79,6 +105,11 @@ func (h *Handler) handlePaymentSuccess(event stripe.Event, ctx context.Context) 
 			Bookingid: util.ToPgInt4(int32(bookingId)),
 			Status:    db.NullPaymentStatus{PaymentStatus: db.PaymentStatusSUCCESS, Valid: true},
 		})
+		if err != nil {
+			return err
+		}
+
+		err = q.ConfirmSeat(ctx, util.ToPgInt4(int32(bookingId)))
 		if err != nil {
 			return err
 		}
@@ -114,6 +145,15 @@ func (h *Handler) handlePaymentExpired(
 
 	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
 
+		booking, err := q.GetBookingById(ctx, int32(bookingID))
+		if err != nil {
+			return err
+		}
+
+		if booking.Status == db.BookingStatusCONFIRMED {
+			return nil
+		}
+
 		// 1. Booking → EXPIRED
 		if err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
 			ID:     int32(bookingID),
@@ -146,41 +186,4 @@ func (h *Handler) handlePaymentExpired(
 		return
 	}
 
-	// 4. Release seat locks (outside DB)
-	holdToken := session.Metadata["hold_token"]
-	if holdToken != "" {
-		h.ReleaseLocksByBooking(ctx, int32(bookingID))
-	}
-}
-
-func (h *Handler) ReleaseLocksByBooking(
-	ctx context.Context,
-	bookingID int32,
-) error {
-
-	rows, err := h.store.GetBookingLockContext(ctx, bookingID)
-	if err != nil {
-		return err
-	}
-
-	if len(rows) == 0 {
-		return nil
-	}
-
-	trainId := strconv.Itoa(int(rows[0].Trainid.Int32))
-	travelDate := rows[0].Traveldate.Time.Format("2006-01-02")
-	holdToken := rows[0].Holdtoken.String
-
-	var seatIds []string
-	for _, row := range rows {
-		seatIds = append(seatIds, strconv.Itoa(int(row.Seatid.Int32)))
-	}
-
-	return h.ReleaseLocks(
-		ctx,
-		trainId,
-		travelDate,
-		seatIds,
-		holdToken,
-	)
 }
