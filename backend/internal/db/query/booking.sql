@@ -95,6 +95,10 @@ WHERE b.id = $1;
 DELETE FROM
 bookingItem b WHERE bookingId = $1 ;
 
+-- name: GetBookingById :one
+SELECT * from booking
+where id = $1;
+
 
 
 
