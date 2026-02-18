@@ -1,4 +1,4 @@
-package tatkal
+package booking
 
 import (
 	"better-uptime/common/middleware"

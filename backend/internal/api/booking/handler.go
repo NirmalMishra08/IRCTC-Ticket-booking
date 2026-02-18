@@ -1,6 +1,7 @@
 package booking
 
 import (
+	"better-uptime/common/kafka"
 	"better-uptime/common/middleware"
 	"better-uptime/common/routes"
 	"better-uptime/config"
@@ -14,13 +15,15 @@ type Handler struct {
 	config *config.Config
 	store  db.Store
 	Redis  redis.Client
+	Kafka  kafka.Producer
 }
 
-func NewHandler(config *config.Config, store db.Store, Redis redis.Client) *Handler {
+func NewHandler(config *config.Config, store db.Store, Redis redis.Client, Kafka kafka.Producer) *Handler {
 	return &Handler{
 		config: config,
 		store:  store,
 		Redis:  Redis,
+		Kafka:  Kafka,
 	}
 }
 

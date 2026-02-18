@@ -1,4 +1,4 @@
-package tatkal
+package booking
 
 import (
 	"context"
@@ -14,6 +14,11 @@ func (t *Handler) Setup(sarama.ConsumerGroupSession) error {
 
 func (t *Handler) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
+}
+
+type TatkalJob struct {
+	UserID string        `json:"user_id"`
+	Data   BookingRequest `json:"data"`
 }
 
 func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
