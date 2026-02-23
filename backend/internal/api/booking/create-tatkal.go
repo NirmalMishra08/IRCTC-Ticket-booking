@@ -13,9 +13,9 @@ import (
 )
 
 type TatkalRequest struct {
-	trainId    string              `json:"train_id,omitempty"`
-	travelDate string              `json:"travel_date,omitempty"`
-	coach_type string              `json:"coach_type,omitempty"`
+	trainId    string             `json:"train_id,omitempty"`
+	travelDate string             `json:"travel_date,omitempty"`
+	coach_type string             `json:"coach_type,omitempty"`
 	passengers []PassengerDetails `json:"passengers,omitempty"`
 }
 

@@ -56,7 +56,10 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 			util.ErrorJson(w, fmt.Errorf("not able to parase the data"))
 			return
 		}
-		err = h.Kafka.Publish(ctx, "tatkal_booking", payload.UserId.String(), value)
+
+		partionKey := fmt.Sprintf("%d:%s:%s", data.JourneyId, data.CoachType, data.BookingType)
+		// partition should be according to the journeyId coach type booking type for the ordering reason
+		err = h.Kafka.Publish(ctx, "tatkal_booking", partionKey, value)
 		if err != nil {
 			util.ErrorJson(w, err)
 			return
