@@ -19,6 +19,7 @@ func (t *Handler) Cleanup(sarama.ConsumerGroupSession) error {
 type TatkalJob struct {
 	UserID string        `json:"user_id"`
 	Data   BookingRequest `json:"data"`
+	RequestCount int
 }
 
 func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {

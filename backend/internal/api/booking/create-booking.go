@@ -24,8 +24,9 @@ type BookingRequest struct {
 }
 
 type PublishJob struct {
-	userId string         `json:"user_id,omitempty"`
-	data   BookingRequest `json:"data,omitempty"`
+	bookingId string         `json:"booking_id,omitempty"`
+	userId    string         `json:"user_id,omitempty"`
+	data      BookingRequest `json:"data,omitempty"`
 }
 
 func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
@@ -44,11 +45,58 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userId := payload.UserId
+
+	if data.SeatCount <= 0 {
+		util.ErrorJson(w, fmt.Errorf("not enought seats"))
+		return
+	}
+
+	// rate limiter for upto 20 request in 10 minutes
+	err = h.RateLimitUser(ctx, userId.String(), 10, 20)
+	if err != nil {
+		util.ErrorJson(w, util.ErrRateLimiting)
+		return
+	}
+
+	train_journey, err := h.store.GetTrainJourneyById(ctx, int32(data.JourneyId))
+	if err != nil {
+		util.ErrorJson(w, errors.New("not able to get train journey details"))
+	}
+
+	if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
+		util.ErrorJson(w, fmt.Errorf("Not opened for booking"))
+		return
+	}
+
+	// check only if the booking type is tatkal
+	if data.BookingType == "TATKAL" {
+		tatkal_data, err := h.store.ValidateTatkalWindow(ctx, util.ToPgInt4(train_journey.TrainID.Int32))
+		if err != nil {
+			util.ErrorJson(w, fmt.Errorf("not able to get tatkal data"))
+			return
+		}
+
+		if time.Now().Before(tatkal_data.TatkalStartTime.Time) || time.Now().After(tatkal_data.TatkalEndTime.Time) {
+			util.ErrorJson(w, fmt.Errorf("current time is outside tatkal booking window"))
+			return
+		}
+	}
+
+	holdToken := string(uuid.New().String())
+
 	if data.BookingType == db.BookingTypeTATKAL {
 
+		booking, err := h.store.CreateBooking(ctx, db.CreateBookingParams{
+			Userid:    pgtype.UUID{Bytes: userId, Valid: true},
+			JourneyID: util.ToPgInt4(int32(data.JourneyId)),
+			Holdtoken: pgtype.Text{String: holdToken, Valid: true},
+		})
+
 		job := PublishJob{
-			userId: payload.UserId.String(),
-			data:   data,
+			bookingId: fmt.Sprintf("%d", booking.ID),
+			userId:    payload.UserId.String(),
+			data:      data,
 		}
 
 		value, err := json.Marshal(job)
@@ -70,47 +118,6 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	} else {
-
-		userId := payload.UserId
-
-		if data.SeatCount <= 0 {
-			util.ErrorJson(w, fmt.Errorf("not enought seats"))
-			return
-		}
-
-		// rate limiter for upto 20 request in 10 minutes
-		err = h.RateLimitUser(ctx, userId.String(), 10, 20)
-		if err != nil {
-			util.ErrorJson(w, util.ErrRateLimiting)
-			return
-		}
-
-		train_journey, err := h.store.GetTrainJourneyById(ctx, int32(data.JourneyId))
-		if err != nil {
-			util.ErrorJson(w, errors.New("not able to get train journey details"))
-		}
-
-		if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
-			util.ErrorJson(w, fmt.Errorf("Not opened for booking"))
-			return
-		}
-
-		// check only if the booking type is tatkal
-		if data.BookingType == "TATKAL" {
-			tatkal_data, err := h.store.ValidateTatkalWindow(ctx, util.ToPgInt4(train_journey.TrainID.Int32))
-			if err != nil {
-				util.ErrorJson(w, fmt.Errorf("not able to get tatkal data"))
-				return
-			}
-
-			if time.Now().Before(tatkal_data.TatkalStartTime.Time) || time.Now().After(tatkal_data.TatkalEndTime.Time) {
-				util.ErrorJson(w, fmt.Errorf("current time is outside tatkal booking window"))
-				return
-			}
-		}
-
-		holdToken := string(uuid.New().String())
-
 		var bookingId int
 
 		err = h.store.ExecTx(ctx, func(q *db.Queries) error {
