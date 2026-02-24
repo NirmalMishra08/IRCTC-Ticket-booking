@@ -17,9 +17,9 @@ func (t *Handler) Cleanup(sarama.ConsumerGroupSession) error {
 }
 
 type TatkalJob struct {
-	UserID string        `json:"user_id"`
-	Data   BookingRequest `json:"data"`
-	RequestCount int
+	BookingID string         `json:"booking_id"`
+	UserID    string         `json:"user_id"`
+	Data      BookingRequest `json:"data"`
 }
 
 func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
@@ -32,10 +32,11 @@ func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama
 			continue
 		}
 
-		err := t.ProcessTatkalUser(
+		err := t.ProcessTatkalBooking(
 			context.Background(),
 			job.Data,
 			job.UserID,
+			job.BookingID,
 		)
 		if err != nil {
 			log.Println("booking failed:", err)
