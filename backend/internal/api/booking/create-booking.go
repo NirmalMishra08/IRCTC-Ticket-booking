@@ -24,9 +24,9 @@ type BookingRequest struct {
 }
 
 type PublishJob struct {
-	bookingId string         `json:"booking_id,omitempty"`
-	userId    string         `json:"user_id,omitempty"`
-	data      BookingRequest `json:"data,omitempty"`
+	BookingID string         `json:"booking_id"`
+	UserID    string         `json:"user_id"`
+	Data      BookingRequest `json:"data"`
 }
 
 func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
@@ -94,9 +94,9 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		})
 
 		job := PublishJob{
-			bookingId: fmt.Sprintf("%d", booking.ID),
-			userId:    payload.UserId.String(),
-			data:      data,
+			BookingID: fmt.Sprintf("%d", booking.ID),
+			UserID:    payload.UserId.String(),
+			Data:      data,
 		}
 
 		value, err := json.Marshal(job)
@@ -200,6 +200,8 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 			Amount:        float64(amount),
 			Transactionid: paymentIntent.SessionURL.SessionID,
 		})
+
+		//Send user notification
 
 		if err != nil {
 			util.ErrorJson(w, fmt.Errorf("not able to create payment"))
