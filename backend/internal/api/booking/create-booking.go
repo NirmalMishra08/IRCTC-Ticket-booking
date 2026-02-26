@@ -143,28 +143,51 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if len(seatIDs) < data.SeatCount {
-				return fmt.Errorf("not enough seats available")
-			}
-
-			for _, seatID := range seatIDs {
-				err := q.HoldSeat(ctx, db.HoldSeatParams{
-					JourneyID: int32(data.JourneyId),
-					SeatID:    seatID,
-					BookingID: util.ToPgInt4(booking.ID),
+				err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+					ID:     booking.ID,
+					Status: db.BookingStatusWAITLIST,
 				})
 				if err != nil {
-					return fmt.Errorf("failed to hold seat %d: %w", seatID, err)
+					return err
 				}
-			}
 
-			for _, seatID := range seatIDs {
-				_, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
-					Bookingid: util.ToPgInt4(booking.ID),
-					Seatid:    util.ToPgInt4(seatID),
+				wlNumber, err := q.GetNextWaitlistNumber(ctx, util.ToPgInt4(int32(data.JourneyId)))
+				if err != nil {
+					return err
+				}
+
+				err = q.InsertWaitlist(ctx, db.InsertWaitlistParams{
+					JourneyID:      util.ToPgInt4(int32(data.JourneyId)),
+					Bookingid:      util.ToPgInt4(int32(bookingId)),
+					WaitlistNumber: int32(wlNumber),
 				})
 				if err != nil {
-					return fmt.Errorf("failed to create booking item: %w", err)
+					return err
 				}
+
+				return nil
+			} else {
+				for _, seatID := range seatIDs {
+					err := q.HoldSeat(ctx, db.HoldSeatParams{
+						JourneyID: int32(data.JourneyId),
+						SeatID:    seatID,
+						BookingID: util.ToPgInt4(booking.ID),
+					})
+					if err != nil {
+						return fmt.Errorf("failed to hold seat %d: %w", seatID, err)
+					}
+				}
+
+				for _, seatID := range seatIDs {
+					_, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
+						Bookingid: util.ToPgInt4(booking.ID),
+						Seatid:    util.ToPgInt4(seatID),
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create booking item: %w", err)
+					}
+				}
+
 			}
 
 			return nil

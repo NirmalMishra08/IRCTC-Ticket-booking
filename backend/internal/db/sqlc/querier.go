@@ -40,6 +40,7 @@ type Querier interface {
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
+	GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.Int4) (int, error)
 	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
@@ -50,6 +51,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	InsertWaitlist(ctx context.Context, arg InsertWaitlistParams) error
 	LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error)
 	LockTrainForLayout(ctx context.Context, id int32) (int32, error)
 	ReleaseExpiredSeats(ctx context.Context) error
