@@ -32,6 +32,8 @@ func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama
 			continue
 		}
 
+		
+
 		err := t.ProcessTatkalBooking(
 			context.Background(),
 			job.Data,
