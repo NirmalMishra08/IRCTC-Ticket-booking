@@ -45,38 +45,51 @@ func (q *Queries) CreateRefund(ctx context.Context, arg CreateRefundParams) (Ref
 }
 
 const getPaymentAndTrain = `-- name: GetPaymentAndTrain :one
-SELECT p.amount,p.status as payment_status,b.id as booking_id , b.travelDate , b.holdToken , b.status as booking_status FROM
+SELECT b.id, b.userid, b.journey_id, b.booking_type, b.status, b.holdtoken, b.createdat , p.id, p.bookingid, p.amount, p.status, p.transactionid, p.createdat
+FROM
 booking b JOIN
 payment p ON b.id = p.bookingId
-WHERE b.trainId = $2 AND b.userId = $1 AND b.travelDate = $3
-LIMIT 1
+WHERE b.journey_id = $2 AND b.userId = $1 AND p.status = "SUCCESS"
 `
 
 type GetPaymentAndTrainParams struct {
-	Userid     pgtype.UUID `json:"userid"`
-	Trainid    pgtype.Int4 `json:"trainid"`
-	Traveldate pgtype.Date `json:"traveldate"`
+	Userid    pgtype.UUID `json:"userid"`
+	JourneyID pgtype.Int4 `json:"journey_id"`
 }
 
 type GetPaymentAndTrainRow struct {
-	Amount        float64           `json:"amount"`
-	PaymentStatus NullPaymentStatus `json:"payment_status"`
-	BookingID     int32             `json:"booking_id"`
-	Traveldate    pgtype.Date       `json:"traveldate"`
+	ID            int32             `json:"id"`
+	Userid        pgtype.UUID       `json:"userid"`
+	JourneyID     pgtype.Int4       `json:"journey_id"`
+	BookingType   BookingType       `json:"booking_type"`
+	Status        BookingStatus     `json:"status"`
 	Holdtoken     pgtype.Text       `json:"holdtoken"`
-	BookingStatus BookingStatus     `json:"booking_status"`
+	Createdat     pgtype.Timestamp  `json:"createdat"`
+	ID_2          int32             `json:"id_2"`
+	Bookingid     pgtype.Int4       `json:"bookingid"`
+	Amount        float64           `json:"amount"`
+	Status_2      NullPaymentStatus `json:"status_2"`
+	Transactionid string            `json:"transactionid"`
+	Createdat_2   pgtype.Timestamp  `json:"createdat_2"`
 }
 
 func (q *Queries) GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error) {
-	row := q.db.QueryRow(ctx, getPaymentAndTrain, arg.Userid, arg.Trainid, arg.Traveldate)
+	row := q.db.QueryRow(ctx, getPaymentAndTrain, arg.Userid, arg.JourneyID)
 	var i GetPaymentAndTrainRow
 	err := row.Scan(
-		&i.Amount,
-		&i.PaymentStatus,
-		&i.BookingID,
-		&i.Traveldate,
+		&i.ID,
+		&i.Userid,
+		&i.JourneyID,
+		&i.BookingType,
+		&i.Status,
 		&i.Holdtoken,
-		&i.BookingStatus,
+		&i.Createdat,
+		&i.ID_2,
+		&i.Bookingid,
+		&i.Amount,
+		&i.Status_2,
+		&i.Transactionid,
+		&i.Createdat_2,
 	)
 	return i, err
 }

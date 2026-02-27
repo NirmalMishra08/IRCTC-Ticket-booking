@@ -18,6 +18,7 @@ type Querier interface {
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+	CreateRefund(ctx context.Context, arg CreateRefundParams) (Refund, error)
 	CreateSeat(ctx context.Context, arg CreateSeatParams) (Seat, error)
 	CreateTrain(ctx context.Context, arg CreateTrainParams) (Train, error)
 	CreateTrainJourney(ctx context.Context, arg CreateTrainJourneyParams) (TrainJourney, error)
@@ -33,11 +34,14 @@ type Querier interface {
 	GetAvailableSeats(ctx context.Context, arg GetAvailableSeatsParams) ([]GetAvailableSeatsRow, error)
 	GetBookedSeats(ctx context.Context, journeyID pgtype.Int4) ([]int32, error)
 	GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Text) (Booking, error)
+	GetBookingById(ctx context.Context, id int32) (Booking, error)
 	GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error)
 	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
+	GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.Int4) (int, error)
+	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
 	GetSeatsByTrain(ctx context.Context, trainid pgtype.Int4) ([]Seat, error)
 	GetTrainById(ctx context.Context, id int32) (Train, error)
@@ -47,9 +51,11 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	InsertWaitlist(ctx context.Context, arg InsertWaitlistParams) error
 	LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error)
 	LockTrainForLayout(ctx context.Context, id int32) (int32, error)
 	ReleaseExpiredSeats(ctx context.Context) error
+	ReleaseSeatsByBooking(ctx context.Context, bookingID pgtype.Int4) error
 	UpdateBookingItemStatus(ctx context.Context, arg UpdateBookingItemStatusParams) error
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
 	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error

@@ -237,6 +237,26 @@ func (q *Queries) GetBookingByHoldToken(ctx context.Context, holdtoken pgtype.Te
 	return i, err
 }
 
+const getBookingById = `-- name: GetBookingById :one
+SELECT id, userid, journey_id, booking_type, status, holdtoken, createdat from booking
+where id = $1
+`
+
+func (q *Queries) GetBookingById(ctx context.Context, id int32) (Booking, error) {
+	row := q.db.QueryRow(ctx, getBookingById, id)
+	var i Booking
+	err := row.Scan(
+		&i.ID,
+		&i.Userid,
+		&i.JourneyID,
+		&i.BookingType,
+		&i.Status,
+		&i.Holdtoken,
+		&i.Createdat,
+	)
+	return i, err
+}
+
 const getBookingItemsByBooking = `-- name: GetBookingItemsByBooking :many
 SELECT seatId FROM bookingItem WHERE bookingId = $1
 `

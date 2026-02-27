@@ -526,6 +526,19 @@ func (q *Queries) ReleaseExpiredSeats(ctx context.Context) error {
 	return err
 }
 
+const releaseSeatsByBooking = `-- name: ReleaseSeatsByBooking :exec
+UPDATE seat_inventory
+SET status = 'AVAILABLE',
+    booking_id = NULL
+WHERE status = 'HELD'
+AND booking_id = $1
+`
+
+func (q *Queries) ReleaseSeatsByBooking(ctx context.Context, bookingID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, releaseSeatsByBooking, bookingID)
+	return err
+}
+
 const validateSchedule = `-- name: ValidateSchedule :one
 SELECT COUNT(*)
 FROM train_schedule

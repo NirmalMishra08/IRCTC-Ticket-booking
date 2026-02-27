@@ -114,6 +114,13 @@ AND booking_id IN (
     AND createdAt < now() - interval '5 minutes'
 );
 
+-- name: ReleaseSeatsByBooking :exec
+UPDATE seat_inventory
+SET status = 'AVAILABLE',
+    booking_id = NULL
+WHERE status = 'HELD'
+AND booking_id = $1;
+
 -- name: GetNextCoachNumber :one
 SELECT COALESCE(MAX(coachNumber), 0) + 1
 FROM coach

@@ -1,10 +1,12 @@
 package booking
 
 import (
+	"better-uptime/common/logger"
 	"better-uptime/common/middleware"
 	"better-uptime/common/stripe"
 	"better-uptime/common/util"
 	db "better-uptime/internal/db/sqlc"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,11 +16,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type bookingRequest struct {
-	JourneyId   int
-	BookingType db.BookingType
-	SeatCount   int
-	CoachType   db.CoachType
+type BookingRequest struct {
+	JourneyId   int            `json:"journey_id,omitempty"`
+	BookingType db.BookingType `json:"booking_type,omitempty"`
+	SeatCount   int            `json:"seat_count,omitempty"`
+	CoachType   db.CoachType   `json:"coach_type,omitempty"`
+}
+
+type PublishJob struct {
+	BookingID string         `json:"booking_id"`
+	UserID    string         `json:"user_id"`
+	Data      BookingRequest `json:"data"`
 }
 
 func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
@@ -30,15 +38,14 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := payload.UserId
-
-	var data bookingRequest
-
+	var data BookingRequest
 	err = util.ReadJsonAndValidate(w, r, &data)
 	if err != nil {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
 	}
+
+	userId := payload.UserId
 
 	if data.SeatCount <= 0 {
 		util.ErrorJson(w, fmt.Errorf("not enought seats"))
@@ -53,13 +60,15 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	train_journey, err := h.store.GetTrainJourneyById(ctx, int32(data.JourneyId))
-
-	if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
-		util.ErrorJson("Not opened for booking")
-	}
 	if err != nil {
 		util.ErrorJson(w, errors.New("not able to get train journey details"))
 	}
+
+	if (train_journey.Status != db.NullJourneyStatus{JourneyStatus: "OPEN", Valid: true}) {
+		util.ErrorJson(w, fmt.Errorf("Not opened for booking"))
+		return
+	}
+
 	// check only if the booking type is tatkal
 	if data.BookingType == "TATKAL" {
 		tatkal_data, err := h.store.ValidateTatkalWindow(ctx, util.ToPgInt4(train_journey.TrainID.Int32))
@@ -74,77 +83,161 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// createBookingIntent for getting booking id
-	booking, err := h.store.CreateBooking(ctx, db.CreateBookingParams{
-		Userid:    pgtype.UUID{Bytes: userId, Valid: true},
-		JourneyID: util.ToPgInt4(int32(data.JourneyId)),
-		Holdtoken: pgtype.Text{String: string(uuid.New().String()), Valid: true},
-	})
+	holdToken := string(uuid.New().String())
 
-	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+	if data.BookingType == db.BookingTypeTATKAL {
 
-		seatIDs, err := q.LockAvailableSeats(ctx, db.LockAvailableSeatsParams{
-			JourneyID: int32(data.JourneyId),
-			CoachType: data.CoachType,
-			Quota:     db.SeatQuota(data.BookingType),
-			SeatLimit: int32(data.SeatCount),
+		booking, err := h.store.CreateBooking(ctx, db.CreateBookingParams{
+			Userid:    pgtype.UUID{Bytes: userId, Valid: true},
+			JourneyID: util.ToPgInt4(int32(data.JourneyId)),
+			Holdtoken: pgtype.Text{String: holdToken, Valid: true},
 		})
+
+		job := PublishJob{
+			BookingID: fmt.Sprintf("%d", booking.ID),
+			UserID:    payload.UserId.String(),
+			Data:      data,
+		}
+
+		value, err := json.Marshal(job)
 		if err != nil {
-			return fmt.Errorf("not able to lock seats: %w", err)
+			util.ErrorJson(w, fmt.Errorf("not able to parase the data"))
+			return
 		}
 
-		if len(seatIDs) < data.SeatCount {
-			return fmt.Errorf("not enough seats available")
+		partionKey := fmt.Sprintf("%d:%s:%s", data.JourneyId, data.CoachType, data.BookingType)
+		// partition should be according to the journeyId coach type booking type for the ordering reason
+		err = h.Kafka.Publish(ctx, "tatkal_booking", partionKey, value)
+		if err != nil {
+			util.ErrorJson(w, err)
+			return
 		}
 
-		for _, seatID := range seatIDs {
-			err := q.HoldSeat(ctx, db.HoldSeatParams{
-				JourneyID: int32(data.JourneyId),
-				SeatID:    seatID,
-				BookingID: util.ToPgInt4(booking.ID),
-			})
-			if err != nil {
-				return fmt.Errorf("failed to hold seat %d: %w", seatID, err)
-			}
-		}
-
-		for _, seatID := range seatIDs {
-			_, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
-				Bookingid: util.ToPgInt4(booking.ID),
-				Seatid:    util.ToPgInt4(seatID),
-			})
-			if err != nil {
-				return fmt.Errorf("failed to create booking item: %w", err)
-			}
-		}
-
-		return nil
-
-	})
-
-	amount := CalculateFare(int32(data.SeatCount), data.CoachType, data.BookingType)
-
-	paymentIntent, err := stripe.StripeSession(ctx, userId.String(), fmt.Sprintf("%d", amount), "booking_train", h.config.STRIPE_SECRET_KEY, int(booking.ID), booking.Holdtoken.String)
-	if err != nil {
-		util.ErrorJson(w, errors.New("not able to create booking intent"))
+		util.WriteJson(w, http.StatusAccepted, map[string]string{
+			"message": "Tatkal booking request accepted. Processing in background.",
+		})
 		return
-	}
+	} else {
+		var bookingId int
 
-	_, err = h.store.CreatePayment(ctx, db.CreatePaymentParams{
-		Bookingid:     util.ToPgInt4(booking.ID),
-		Amount:        float64(amount),
-		Transactionid: paymentIntent.SessionURL.SessionID,
-	})
+		err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+			booking, err := q.CreateBooking(ctx, db.CreateBookingParams{
+				Userid:    pgtype.UUID{Bytes: userId, Valid: true},
+				JourneyID: util.ToPgInt4(int32(data.JourneyId)),
+				Holdtoken: pgtype.Text{String: holdToken, Valid: true},
+			})
+			if err != nil {
+				return fmt.Errorf("not able to book seats: %w", err)
+			}
 
-	if err != nil {
-		util.ErrorJson(w, fmt.Errorf("not able to create payment"))
+			bookingId = int(booking.ID)
+
+			seatIDs, err := q.LockAvailableSeats(ctx, db.LockAvailableSeatsParams{
+				JourneyID: int32(data.JourneyId),
+				CoachType: data.CoachType,
+				Quota:     db.SeatQuota(data.BookingType),
+				SeatLimit: int32(data.SeatCount),
+			})
+			if err != nil {
+				return fmt.Errorf("not able to lock seats: %w", err)
+			}
+
+			if len(seatIDs) < data.SeatCount {
+				err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+					ID:     booking.ID,
+					Status: db.BookingStatusWAITLIST,
+				})
+				if err != nil {
+					return err
+				}
+
+				wlNumber, err := q.GetNextWaitlistNumber(ctx, util.ToPgInt4(int32(data.JourneyId)))
+				if err != nil {
+					return err
+				}
+
+				err = q.InsertWaitlist(ctx, db.InsertWaitlistParams{
+					JourneyID:      util.ToPgInt4(int32(data.JourneyId)),
+					Bookingid:      util.ToPgInt4(int32(bookingId)),
+					WaitlistNumber: int32(wlNumber),
+				})
+				if err != nil {
+					return err
+				}
+
+				return nil
+			} else {
+				for _, seatID := range seatIDs {
+					err := q.HoldSeat(ctx, db.HoldSeatParams{
+						JourneyID: int32(data.JourneyId),
+						SeatID:    seatID,
+						BookingID: util.ToPgInt4(booking.ID),
+					})
+					if err != nil {
+						return fmt.Errorf("failed to hold seat %d: %w", seatID, err)
+					}
+				}
+
+				for _, seatID := range seatIDs {
+					_, err := q.CreateBookingItem(ctx, db.CreateBookingItemParams{
+						Bookingid: util.ToPgInt4(booking.ID),
+						Seatid:    util.ToPgInt4(seatID),
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create booking item: %w", err)
+					}
+				}
+
+			}
+
+			return nil
+
+		})
+
+		if err != nil {
+			util.ErrorJson(w, err)
+			return
+		}
+
+		amount := CalculateFare(int32(data.SeatCount), data.CoachType, data.BookingType)
+
+		paymentIntent, err := stripe.StripeSession(ctx, userId.String(), fmt.Sprintf("%d", amount), "booking_train", h.config.STRIPE_SECRET_KEY, int(bookingId), holdToken)
+		if err != nil {
+			updateErr := h.store.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
+				ID:     int32(bookingId),
+				Status: db.BookingStatusEXPIRED,
+			})
+
+			if updateErr != nil {
+				logger.Error("failed to expire booking %d: %v", bookingId, updateErr)
+			}
+
+			_ = h.store.ReleaseSeatsByBooking(ctx, util.ToPgInt4(int32(bookingId)))
+
+			util.ErrorJson(w, errors.New("not able to create booking intent"))
+			return
+		}
+
+		_, err = h.store.CreatePayment(ctx, db.CreatePaymentParams{
+			Bookingid:     util.ToPgInt4(int32(bookingId)),
+			Amount:        float64(amount),
+			Transactionid: paymentIntent.SessionURL.SessionID,
+		})
+
+		//Send user notification
+
+		if err != nil {
+			util.ErrorJson(w, fmt.Errorf("not able to create payment"))
+		}
+		response := map[string]interface{}{
+			"bookingId":  bookingId,
+			"sessionUrl": paymentIntent.SessionURL,
+			"expires_in": 600,
+		}
+
+		util.WriteJson(w, http.StatusOK, response)
+
 	}
-	response := map[string]interface{}{
-		"bookingId":  booking.ID,
-		"sessionUrl": paymentIntent.SessionURL,
-		"expires_in": 600,
-	}
-	util.WriteJson(w, http.StatusOK, response)
 }
 
 func CalculateFare(seatIds int32, coachType db.CoachType, bookingType db.BookingType) int32 {

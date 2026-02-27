@@ -1,4 +1,4 @@
-package tatkal
+package booking
 
 import (
 	"context"
@@ -16,6 +16,12 @@ func (t *Handler) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
 }
 
+type TatkalJob struct {
+	BookingID string         `json:"booking_id"`
+	UserID    string         `json:"user_id"`
+	Data      BookingRequest `json:"data"`
+}
+
 func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		var job TatkalJob
@@ -26,10 +32,13 @@ func (t *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama
 			continue
 		}
 
-		err := t.ProcessTatkalUser(
+		
+
+		err := t.ProcessTatkalBooking(
 			context.Background(),
 			job.Data,
 			job.UserID,
+			job.BookingID,
 		)
 		if err != nil {
 			log.Println("booking failed:", err)

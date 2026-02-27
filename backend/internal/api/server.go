@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"better-uptime/common/kafka"
 	"better-uptime/config"
 	"better-uptime/internal/api/auth"
 	"better-uptime/internal/api/booking"
@@ -15,13 +16,14 @@ import (
 )
 
 type Server struct {
-	store       db.Store
-	cfg         *config.Config
-	rdb         redis.Client
-	router      *chi.Mux
-	authHandler *auth.Handler
-	trainHandler *train.Handler
+	store          db.Store
+	cfg            *config.Config
+	rdb            redis.Client
+	router         *chi.Mux
+	authHandler    *auth.Handler
+	trainHandler   *train.Handler
 	bookingHandler *booking.Handler
+	kafka          kafka.Producer
 }
 
 type ServerConfig struct {
@@ -36,7 +38,7 @@ type ServerConfig struct {
 }
 
 // NewServer creates a new API server instance
-func NewServer(store db.Store, cfg *config.Config, rdb redis.Client) *Server {
+func NewServer(store db.Store, cfg *config.Config, rdb redis.Client, kafka kafka.Producer) *Server {
 
 	// Create the server instance first
 	server := &Server{
@@ -47,8 +49,8 @@ func NewServer(store db.Store, cfg *config.Config, rdb redis.Client) *Server {
 
 	// Initialize the auth handler with only required dependencies
 	server.authHandler = auth.NewHandler(cfg, store)
-	server.bookingHandler = booking.NewHandler(cfg,store,rdb)
-	server.trainHandler = train.NewHandler(cfg,store)
+	server.bookingHandler = booking.NewHandler(cfg, store, rdb, kafka)
+	server.trainHandler = train.NewHandler(cfg, store)
 
 	// You can now mount auth routes here like:
 	// r.Post("/login", server.authHandler.Login)
