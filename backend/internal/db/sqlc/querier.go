@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	ConfirmSeat(ctx context.Context, bookingID pgtype.Int4) error
 	CountActiveBookingByTrain(ctx context.Context, journeyID pgtype.Int4) (int64, error)
+	CountSeatsByBooking(ctx context.Context, bookingid pgtype.Int4) (int64, error)
 	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
