@@ -229,6 +229,22 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			util.ErrorJson(w, fmt.Errorf("not able to create payment"))
 		}
+
+		booking, err := h.store.GetBookingById(ctx, int32(bookingId))
+		if err != nil {
+			util.ErrorJson(w, err)
+			return
+		}
+
+		if booking.Status == db.BookingStatusWAITLIST {
+			util.WriteJson(w, http.StatusOK, map[string]interface{}{
+				"bookingId": bookingId,
+				"status":    "WAITLIST",
+				"message":   "Seats not available. You are on waitlist.",
+			})
+			return
+		}
+
 		response := map[string]interface{}{
 			"bookingId":  bookingId,
 			"sessionUrl": paymentIntent.SessionURL,
