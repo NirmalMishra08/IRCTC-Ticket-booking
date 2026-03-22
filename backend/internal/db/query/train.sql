@@ -149,3 +149,8 @@ WHERE journey_id = sqlc.arg(journey_id)
 ORDER BY seat_id
 FOR UPDATE SKIP LOCKED
 LIMIT sqlc.arg(seat_limit);
+
+-- name: GetCoachTypeByJourneyId :one
+select coach_type 
+from seat_inventory
+WHERE journey_id = $1;

@@ -263,6 +263,19 @@ func (q *Queries) GetAvailableSeats(ctx context.Context, arg GetAvailableSeatsPa
 	return items, nil
 }
 
+const getCoachTypeByJourneyId = `-- name: GetCoachTypeByJourneyId :one
+select coach_type 
+from seat_inventory
+WHERE journey_id = $1
+`
+
+func (q *Queries) GetCoachTypeByJourneyId(ctx context.Context, journeyID int32) (CoachType, error) {
+	row := q.db.QueryRow(ctx, getCoachTypeByJourneyId, journeyID)
+	var coach_type CoachType
+	err := row.Scan(&coach_type)
+	return coach_type, err
+}
+
 const getCoachesByTrain = `-- name: GetCoachesByTrain :many
 SELECT id, trainid, coachtype, coachnumber FROM coach WHERE trainId = $1
 `

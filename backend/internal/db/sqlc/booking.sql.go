@@ -25,6 +25,17 @@ func (q *Queries) CountActiveBookingByTrain(ctx context.Context, journeyID pgtyp
 	return count, err
 }
 
+const countSeatsByBooking = `-- name: CountSeatsByBooking :one
+SELECT COUNT(*) FROM bookingItem WHERE bookingId = $1
+`
+
+func (q *Queries) CountSeatsByBooking(ctx context.Context, bookingid pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countSeatsByBooking, bookingid)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBooking = `-- name: CreateBooking :one
 INSERT INTO booking (userId, journey_id, booking_type, status, holdToken)
 VALUES ($1, $2, 'NORMAL', 'PENDING', $3)

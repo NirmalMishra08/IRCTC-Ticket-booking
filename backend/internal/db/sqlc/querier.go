@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	ConfirmSeat(ctx context.Context, bookingID pgtype.Int4) error
 	CountActiveBookingByTrain(ctx context.Context, journeyID pgtype.Int4) (int64, error)
+	CountSeatsByBooking(ctx context.Context, bookingid pgtype.Int4) (int64, error)
 	CreateBooking(ctx context.Context, arg CreateBookingParams) (Booking, error)
 	CreateBookingItem(ctx context.Context, arg CreateBookingItemParams) (Bookingitem, error)
 	CreateCoach(ctx context.Context, arg CreateCoachParams) (Coach, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	GetBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) ([]pgtype.Int4, error)
 	GetBookingLockContext(ctx context.Context, id int32) ([]GetBookingLockContextRow, error)
 	GetBookingbyUserId(ctx context.Context, userid pgtype.UUID) ([]GetBookingbyUserIdRow, error)
+	GetCoachTypeByJourneyId(ctx context.Context, journeyID int32) (CoachType, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
 	GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.Int4) (int, error)

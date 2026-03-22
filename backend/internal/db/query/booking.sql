@@ -99,6 +99,8 @@ bookingItem b WHERE bookingId = $1 ;
 SELECT * from booking
 where id = $1;
 
+-- name: CountSeatsByBooking :one
+SELECT COUNT(*) FROM bookingItem WHERE bookingId = $1;
 
 
 
