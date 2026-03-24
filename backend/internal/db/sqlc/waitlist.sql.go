@@ -11,6 +11,54 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelWaitlist = `-- name: CancelWaitlist :exec
+UPDATE waitlist
+SET status = 'CANCELLED',
+    updatedAt = now()
+WHERE bookingId = $1
+`
+
+func (q *Queries) CancelWaitlist(ctx context.Context, bookingid pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, cancelWaitlist, bookingid)
+	return err
+}
+
+const deleteWaitlist = `-- name: DeleteWaitlist :exec
+DELETE FROM waitlist
+WHERE bookingId = $1
+`
+
+func (q *Queries) DeleteWaitlist(ctx context.Context, bookingid pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteWaitlist, bookingid)
+	return err
+}
+
+const getNextWaitlist = `-- name: GetNextWaitlist :one
+SELECT id, journey_id, bookingid, waitlist_number, status, priority_level, createdat, updatedat
+FROM waitlist
+WHERE journey_id = $1
+  AND status = 'WAITING'
+ORDER BY priority_level DESC, waitlist_number ASC
+LIMIT 1
+FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) GetNextWaitlist(ctx context.Context, journeyID pgtype.Int4) (Waitlist, error) {
+	row := q.db.QueryRow(ctx, getNextWaitlist, journeyID)
+	var i Waitlist
+	err := row.Scan(
+		&i.ID,
+		&i.JourneyID,
+		&i.Bookingid,
+		&i.WaitlistNumber,
+		&i.Status,
+		&i.PriorityLevel,
+		&i.Createdat,
+		&i.Updatedat,
+	)
+	return i, err
+}
+
 const getNextWaitlistNumber = `-- name: GetNextWaitlistNumber :one
 select COALESCE(MAX(waitlist_number), 0) + 1
 from waitlist
@@ -23,6 +71,49 @@ func (q *Queries) GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.In
 	var column_1 int
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const getWaitlistBatch = `-- name: GetWaitlistBatch :many
+SELECT id, journey_id, bookingid, waitlist_number, status, priority_level, createdat, updatedat
+FROM waitlist
+WHERE journey_id = $1
+  AND status = 'WAITING'
+ORDER BY priority_level DESC, waitlist_number ASC
+LIMIT $2
+`
+
+type GetWaitlistBatchParams struct {
+	JourneyID pgtype.Int4 `json:"journey_id"`
+	Limit     int32       `json:"limit"`
+}
+
+func (q *Queries) GetWaitlistBatch(ctx context.Context, arg GetWaitlistBatchParams) ([]Waitlist, error) {
+	rows, err := q.db.Query(ctx, getWaitlistBatch, arg.JourneyID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Waitlist{}
+	for rows.Next() {
+		var i Waitlist
+		if err := rows.Scan(
+			&i.ID,
+			&i.JourneyID,
+			&i.Bookingid,
+			&i.WaitlistNumber,
+			&i.Status,
+			&i.PriorityLevel,
+			&i.Createdat,
+			&i.Updatedat,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertWaitlist = `-- name: InsertWaitlist :exec
@@ -43,5 +134,22 @@ type InsertWaitlistParams struct {
 
 func (q *Queries) InsertWaitlist(ctx context.Context, arg InsertWaitlistParams) error {
 	_, err := q.db.Exec(ctx, insertWaitlist, arg.JourneyID, arg.Bookingid, arg.WaitlistNumber)
+	return err
+}
+
+const updateWaitlistStatus = `-- name: UpdateWaitlistStatus :exec
+UPDATE waitlist
+SET status = $2,
+    updatedAt = now()
+WHERE id = $1
+`
+
+type UpdateWaitlistStatusParams struct {
+	ID     int32         `json:"id"`
+	Status WaitingStatus `json:"status"`
+}
+
+func (q *Queries) UpdateWaitlistStatus(ctx context.Context, arg UpdateWaitlistStatusParams) error {
+	_, err := q.db.Exec(ctx, updateWaitlistStatus, arg.ID, arg.Status)
 	return err
 }

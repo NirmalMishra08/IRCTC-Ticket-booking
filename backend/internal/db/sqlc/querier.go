@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	CancelWaitlist(ctx context.Context, bookingid pgtype.Int4) error
 	ConfirmSeat(ctx context.Context, bookingID pgtype.Int4) error
 	CountActiveBookingByTrain(ctx context.Context, journeyID pgtype.Int4) (int64, error)
 	CountSeatsByBooking(ctx context.Context, bookingid pgtype.Int4) (int64, error)
@@ -28,6 +29,7 @@ type Querier interface {
 	CurrentAvailableSeats(ctx context.Context, arg CurrentAvailableSeatsParams) ([]int32, error)
 	DeleteBookingItem(ctx context.Context, bookingid pgtype.Int4) error
 	DeleteBookingItemsByBooking(ctx context.Context, bookingid pgtype.Int4) error
+	DeleteWaitlist(ctx context.Context, bookingid pgtype.Int4) error
 	ExpireOldBooking(ctx context.Context) error
 	FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (FindOrCreateUserRow, error)
 	GetActiveBookingByUser(ctx context.Context, userid pgtype.UUID) (Booking, error)
@@ -42,6 +44,7 @@ type Querier interface {
 	GetCoachTypeByJourneyId(ctx context.Context, journeyID int32) (CoachType, error)
 	GetCoachesByTrain(ctx context.Context, trainid pgtype.Int4) ([]Coach, error)
 	GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error)
+	GetNextWaitlist(ctx context.Context, journeyID pgtype.Int4) (Waitlist, error)
 	GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.Int4) (int, error)
 	GetPaymentAndTrain(ctx context.Context, arg GetPaymentAndTrainParams) (GetPaymentAndTrainRow, error)
 	GetSeatsByCoach(ctx context.Context, coachid pgtype.Int4) ([]Seat, error)
@@ -51,6 +54,7 @@ type Querier interface {
 	GetTrainScheduleByDay(ctx context.Context, arg GetTrainScheduleByDayParams) (TrainSchedule, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetWaitlistBatch(ctx context.Context, arg GetWaitlistBatchParams) ([]Waitlist, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
 	InsertWaitlist(ctx context.Context, arg InsertWaitlistParams) error
@@ -62,6 +66,7 @@ type Querier interface {
 	UpdateBookingStatus(ctx context.Context, arg UpdateBookingStatusParams) error
 	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	UpdateWaitlistStatus(ctx context.Context, arg UpdateWaitlistStatusParams) error
 	ValidateSchedule(ctx context.Context, arg ValidateScheduleParams) (int64, error)
 	ValidateSeatsBelongToTrain(ctx context.Context, arg ValidateSeatsBelongToTrainParams) (ValidateSeatsBelongToTrainRow, error)
 	ValidateTatkalWindow(ctx context.Context, trainID pgtype.Int4) (TatkalConfig, error)
