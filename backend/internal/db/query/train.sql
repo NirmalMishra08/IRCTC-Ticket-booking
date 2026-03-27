@@ -154,3 +154,5 @@ LIMIT sqlc.arg(seat_limit);
 select coach_type 
 from seat_inventory
 WHERE journey_id = $1;
+
+

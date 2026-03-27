@@ -1,6 +1,7 @@
 package cancellation
 
 import (
+	"better-uptime/common/kafka"
 	"better-uptime/common/middleware"
 	"better-uptime/common/routes"
 	"better-uptime/config"
@@ -12,12 +13,14 @@ import (
 type Handler struct {
 	store  db.Store
 	config *config.Config
+    Kafka  kafka.Producer
 }
 
-func NewHandler(config *config.Config, store db.Store) *Handler {
+func NewHandler(config *config.Config, store db.Store, Kafka kafka.Producer) *Handler {
 	return &Handler{
 		config: config,
 		store:  store,
+		Kafka: Kafka,
 	}
 }
 

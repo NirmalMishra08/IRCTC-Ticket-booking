@@ -65,12 +65,18 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 
 	bookingId := trainWithAmount.Bookingid
 
+	var releasedSeats int64
+
 	apiResponse, err := stripe.RefundSession(ctx, userId.String(), amountStr, trainWithAmount.Holdtoken.String, h.config.REDIS_DB_URL)
 	if err != nil || apiResponse == nil {
 		util.ErrorJson(w, err)
 	}
 	//begin db transaction
 	err = h.store.ExecTx(ctx, func(q *db.Queries) error {
+		releasedSeats, err = q.CountSeatsByBooking(ctx, util.ToPgInt4(bookingId.Int32))
+		if err != nil {
+			return fmt.Errorf("failed to count seats: %w", err)
+		}
 		// update booking -> cancelled
 		err := q.UpdateBookingStatus(ctx, db.UpdateBookingStatusParams{
 			ID:     bookingId.Int32,
@@ -108,6 +114,23 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 		util.ErrorJson(w, err)
 		return
 	}
+
+	coachtype, err := h.store.GetCoachTypeByJourneyId(ctx, int32(JourneyId))
+	if err != nil {
+		util.ErrorJson(w, fmt.Errorf("not able to get the coach type"))
+	}
+
+	key := fmt.Sprintf("%d:%s", JourneyId, coachtype)
+
+	message := map[string]interface{}{
+		"journey_id":     JourneyId,
+		"coach_type":     coachtype,
+		"released_seats": releasedSeats,
+		"timestamp":      time.Now().Unix(),
+	}
+
+	value, _ := json.Marshal(message)
+	h.Kafka.Publish(ctx, "seat_released", key, value)
 
 	response := map[string]interface{}{
 		"message":         "refund in process",
