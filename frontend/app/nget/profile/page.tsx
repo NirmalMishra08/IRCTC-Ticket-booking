@@ -1,126 +1,174 @@
 'use client'
 import React, { useState } from 'react'
 import { FaTrain, FaGoogle, FaEnvelope, FaLock, FaUser, FaArrowLeft } from 'react-icons/fa'
+import { apiFetch } from '@/lib/api'
+import { useRouter } from 'next/navigation'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullname, setFullname] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      if (isLogin) {
+        const res = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        })
+        localStorage.setItem('token', res.data.access_token)
+        router.push('/')
+      } else {
+        // Backend for create-user was empty, but we'll try the common endpoint
+        const res = await apiFetch('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, fullname }),
+        })
+        setIsLogin(true)
+        setError('Registration successful! Please login.')
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center font-sans relative overflow-hidden bg-gray-50">
-      
-      {/* --- BACKGROUND LAYER (Matches your Hero) --- */}
-      <div className="absolute inset-0 z-0">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url('/train-back.jpg')` }}
+    <div className="flex h-screen w-full bg-white overflow-hidden">
+      {/* Left Side Info */}
+      <div className="w-1/2 hidden md:flex flex-col items-center justify-center bg-[#f7f7f5] p-12 relative overflow-hidden">
+        <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-black/[0.02] rounded-full blur-[80px]" />
+        <div className="z-10 text-center space-y-6">
+          <div className="w-20 h-20 bg-gray-900 rounded-3xl flex items-center justify-center mx-auto shadow-2xl mb-8 transform rotate-12">
+            <FaTrain className="text-white text-4xl" />
+          </div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-tight">
+            The Future of<br />Rail Travel.
+          </h1>
+          <p className="text-gray-400 max-w-xs mx-auto leading-relaxed">
+            Experience seamless booking across India's vast railway network.
+          </p>
+        </div>
+        <img
+          className="absolute bottom-0 left-0 w-full opacity-10 pointer-events-none"
+          src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/login/leftSideImage.png"
+          alt="decoration"
         />
-        <div 
-          className="absolute inset-0 backdrop-blur-md"
-          style={{
-            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 40%, black 60%, transparent 100%)',
-            maskImage: 'linear-gradient(to right, transparent 0%, black 40%, black 60%, transparent 100%)',
-          }}
-        />
-        <div className="absolute inset-0 bg-white/60" />
       </div>
 
-      {/* --- AUTH CARD --- */}
-      <div className="relative z-10 w-full max-w-md px-6">
-        
-        {/* Back to Home Link */}
-        <a href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 mb-8 transition-colors">
-          <FaArrowLeft size={12} /> Back to Search
-        </a>
-
-        <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/20 p-10">
-          
-          {/* Logo */}
-          <div className="flex justify-center mb-8">
-            <div className="flex items-center gap-2 font-black text-2xl tracking-tighter text-slate-800">
-              <div className="bg-slate-800 text-white p-1.5 rounded-lg">
-                <FaTrain size={18} />
-              </div>
-              RAIL<span className="text-orange-500">GO</span>
-            </div>
-          </div>
-
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
+      {/* Right Side Form */}
+      <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-8 bg-white">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6 animate-fade-in-up">
+          <div className="space-y-2 text-center md:text-left">
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+              {isLogin ? 'Sign In' : 'Create Account'}
             </h2>
-            <p className="text-gray-500 text-sm mt-1">
-              {isLogin ? 'Login to manage your bookings' : 'Join 25M+ travelers across India'}
+            <p className="text-sm text-gray-400 font-medium">
+              {isLogin
+                ? 'Welcome back! Please sign in to continue'
+                : 'Join us to start your journey across India'}
             </p>
           </div>
 
-          {/* Form */}
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-500 px-4 py-3 rounded-2xl text-xs font-bold animate-shake">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
             {!isLogin && (
-              <div className="relative">
-                <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                <input 
-                  type="text" 
+              <div className="relative group">
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors">
+                  <FaUser size={14} />
+                </div>
+                <input
+                  type="text"
                   placeholder="Full Name"
-                  className="w-full bg-white/50 border border-gray-200 rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all font-medium text-slate-800"
+                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all text-sm font-bold placeholder:text-gray-300"
+                  required
+                  value={fullname}
+                  onChange={(e) => setFullname(e.target.value)}
                 />
               </div>
             )}
 
-            <div className="relative">
-              <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input 
-                type="email" 
-                placeholder="Email Address"
-                className="w-full bg-white/50 border border-gray-200 rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all font-medium text-slate-800"
-              />
-            </div>
-
-            <div className="relative">
-              <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input 
-                type="password" 
-                placeholder="Password"
-                className="w-full bg-white/50 border border-gray-200 rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all font-medium text-slate-800"
-              />
-            </div>
-
-            {isLogin && (
-              <div className="text-right">
-                <button className="text-xs font-bold text-slate-500 hover:text-slate-900">Forgot Password?</button>
+            <div className="relative group">
+              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors">
+                <FaEnvelope size={14} />
               </div>
-            )}
+              <input
+                type="email"
+                placeholder="Email Address"
+                className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all text-sm font-bold placeholder:text-gray-300"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-            <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 shadow-lg hover:shadow-slate-900/20 transition-all transform active:scale-[0.98] mt-2">
-              {isLogin ? 'Sign In' : 'Get Started'}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center my-6 gap-4">
-            <div className="h-[1px] bg-gray-200 flex-1"></div>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Or continue with</span>
-            <div className="h-[1px] bg-gray-200 flex-1"></div>
+            <div className="relative group">
+              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors">
+                <FaLock size={14} />
+              </div>
+              <input
+                type="password"
+                placeholder="Password"
+                className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all text-sm font-bold placeholder:text-gray-300"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
           </div>
 
-          {/* Social Auth */}
-          <button className="w-full bg-white border border-gray-200 text-slate-700 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors shadow-sm">
-            <FaGoogle className="text-red-500" />
-            Google
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-14 rounded-2xl text-white bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 transition-all font-bold shadow-[0_4px_20px_rgba(0,0,0,0.12)] transform active:scale-[0.98] flex items-center justify-center"
+          >
+            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Register')}
           </button>
 
-          {/* Footer Toggle */}
-          <p className="text-center mt-8 text-sm text-gray-500">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
-            <button 
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-100"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-4 text-gray-400 font-bold tracking-widest leading-none">OR</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="w-full h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 transition-all font-bold text-sm text-gray-700 shadow-sm"
+          >
+            <FaGoogle className="text-gray-400" />
+            Continue with Google
+          </button>
+
+          <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+            {isLogin ? "Don't have an account?" : "Already have an account?"}
+            <button
+              type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-slate-900 font-bold hover:underline"
+              className="ml-2 text-gray-900 hover:underline transition-colors"
             >
-              {isLogin ? 'Sign Up' : 'Log In'}
+              {isLogin ? 'Register' : 'Sign In'}
             </button>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   )
 }
+
