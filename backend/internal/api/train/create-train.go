@@ -12,14 +12,13 @@ import (
 )
 
 type CreateTrainRequest struct {
-	TrainNumber int       `json:"train_number"`
-	TrainName   string    `json:"train_name"`
-	Source      string    `json:"source"`
-	Destination string    `json:"destination"`
-	Day         string    `json:"day"`
+	TrainNumber int    `json:"train_number"`
+	TrainName   string `json:"train_name"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Day         string `json:"day"`
 	ArrivalTime string `json:"arrival_time"`
 }
-
 
 type CreateTrainResponse struct {
 	Train         db.Train         `json:"train"`
@@ -35,7 +34,7 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	role:= payload.Role
+	role := payload.Role
 	if role != "ADMIN" {
 		util.ErrorJson(w, util.ErrUnauthorized)
 		return
@@ -51,7 +50,7 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 
 	r.Body.Close()
 
-	arrivalGoTime, err := time.Parse("15:04", data.ArrivalTime)
+	arrivalGoTime, err := time.Parse(time.RFC3339, data.ArrivalTime)
 	if err != nil {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return

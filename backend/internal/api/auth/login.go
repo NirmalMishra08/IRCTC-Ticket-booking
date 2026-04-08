@@ -32,6 +32,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var payload firebase.FirebasePayload
 	var err error
 
+
 	// For frontend testing bypass
 	if idToken == "frontend" {
 		payload = firebase.FirebasePayload{
