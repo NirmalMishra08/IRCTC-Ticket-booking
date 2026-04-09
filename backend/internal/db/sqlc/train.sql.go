@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -138,8 +139,8 @@ RETURNING id, trainid, day, arrivaltime, departuretime
 type CreateTrainScheduleParams struct {
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   pgtype.Time `json:"arrivaltime"`
-	Departuretime pgtype.Time `json:"departuretime"`
+	Arrivaltime   time.Time   `json:"arrivaltime"`
+	Departuretime time.Time   `json:"departuretime"`
 }
 
 func (q *Queries) CreateTrainSchedule(ctx context.Context, arg CreateTrainScheduleParams) (TrainSchedule, error) {
@@ -175,8 +176,8 @@ type GetAllTrainRow struct {
 	ID_2          int32       `json:"id_2"`
 	Trainid       pgtype.Int4 `json:"trainid"`
 	Day           DayOfWeek   `json:"day"`
-	Arrivaltime   pgtype.Time `json:"arrivaltime"`
-	Departuretime pgtype.Time `json:"departuretime"`
+	Arrivaltime   time.Time   `json:"arrivaltime"`
+	Departuretime time.Time   `json:"departuretime"`
 }
 
 func (q *Queries) GetAllTrain(ctx context.Context) ([]GetAllTrainRow, error) {
@@ -309,7 +310,6 @@ const getNextCoachNumber = `-- name: GetNextCoachNumber :one
 SELECT COALESCE(MAX(coachNumber), 0) + 1
 FROM coach
 WHERE trainId = $1
-FOR UPDATE
 `
 
 func (q *Queries) GetNextCoachNumber(ctx context.Context, trainid pgtype.Int4) (int, error) {

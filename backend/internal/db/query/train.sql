@@ -124,8 +124,7 @@ AND booking_id = $1;
 -- name: GetNextCoachNumber :one
 SELECT COALESCE(MAX(coachNumber), 0) + 1
 FROM coach
-WHERE trainId = $1
-FOR UPDATE;
+WHERE trainId = $1;
 
 -- name: LockTrainForLayout :one
 SELECT id
