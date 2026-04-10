@@ -31,6 +31,7 @@ func (h *Handler) Routes() *chi.Mux {
 		r.Post("/create-train", h.CreateTrain)
 		r.Post("/coach-seat", h.CreateCoachesAndSeats)
 		r.Post("/get-all-seats",h.GetAvailableSeats)
+		r.Post("/create-journey", h.CreateJourney)
 
 	})
 

@@ -73,8 +73,8 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 	trainSchedule, err := h.store.CreateTrainSchedule(ctx, db.CreateTrainScheduleParams{
 		Trainid:       pgtype.Int4{Int32: train.ID, Valid: true},
 		Day:           db.DayOfWeek(data.Day),
-		Arrivaltime:   pgtype.Time{Microseconds: int64(arrivalGoTime.Hour()*3600000 + arrivalGoTime.Minute()*60000 + arrivalGoTime.Second()*1000000), Valid: true},
-		Departuretime: pgtype.Time{Microseconds: int64(departureTime.Hour()*3600000 + departureTime.Minute()*60000 + departureTime.Second()*1000000), Valid: true},
+		Arrivaltime:   arrivalGoTime,
+		Departuretime: departureTime,
 	})
 	if err != nil {
 		util.ErrorJson(w, err)

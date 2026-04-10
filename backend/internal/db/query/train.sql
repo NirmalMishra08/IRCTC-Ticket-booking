@@ -154,4 +154,16 @@ select coach_type
 from seat_inventory
 WHERE journey_id = $1;
 
+-- name: InitializeSeatInventory :exec
+INSERT INTO seat_inventory (journey_id, seat_id, coach_type, quota, status)
+SELECT 
+    $1,                   
+    s.id,
+    c.coachtype,
+    'NORMAL',              
+    'AVAILABLE'
+FROM seat s
+JOIN coach c ON s.coachId = c.id
+WHERE c.trainId = $2;
+
 

@@ -465,6 +465,29 @@ func (q *Queries) HoldSeat(ctx context.Context, arg HoldSeatParams) error {
 	return err
 }
 
+const initializeSeatInventory = `-- name: InitializeSeatInventory :exec
+INSERT INTO seat_inventory (journey_id, seat_id, coach_type, quota, status)
+SELECT 
+    $1,                   
+    s.id,
+    c.coachtype,
+    'NORMAL',              
+    'AVAILABLE'
+FROM seat s
+JOIN coach c ON s.coachId = c.id
+WHERE c.trainId = $2
+`
+
+type InitializeSeatInventoryParams struct {
+	JourneyID int32       `json:"journey_id"`
+	Trainid   pgtype.Int4 `json:"trainid"`
+}
+
+func (q *Queries) InitializeSeatInventory(ctx context.Context, arg InitializeSeatInventoryParams) error {
+	_, err := q.db.Exec(ctx, initializeSeatInventory, arg.JourneyID, arg.Trainid)
+	return err
+}
+
 const lockAvailableSeats = `-- name: LockAvailableSeats :many
 SELECT seat_id
 FROM seat_inventory

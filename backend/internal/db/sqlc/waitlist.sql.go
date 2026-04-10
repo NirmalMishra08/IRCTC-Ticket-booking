@@ -60,10 +60,14 @@ func (q *Queries) GetNextWaitlist(ctx context.Context, journeyID pgtype.Int4) (W
 }
 
 const getNextWaitlistNumber = `-- name: GetNextWaitlistNumber :one
-select COALESCE(MAX(waitlist_number), 0) + 1
-from waitlist
-WHERE journey_id = $1
-FOR UPDATE
+WITH locked_rows AS (
+    SELECT waitlist_number
+    FROM waitlist
+    WHERE journey_id = $1
+    FOR UPDATE
+)
+SELECT COALESCE(MAX(waitlist_number), 0) + 1
+FROM locked_rows
 `
 
 func (q *Queries) GetNextWaitlistNumber(ctx context.Context, journeyID pgtype.Int4) (int, error) {
