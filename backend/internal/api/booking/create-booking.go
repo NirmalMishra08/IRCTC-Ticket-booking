@@ -53,7 +53,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// rate limiter for upto 20 request in 10 minutes
-	err = h.RateLimitUser(ctx, userId.String(), 10, 20)
+	err = h.RateLimitUser(ctx, userId.String(), 10* time.Minute, 20)
 	if err != nil {
 		util.ErrorJson(w, util.ErrRateLimiting)
 		return
@@ -210,6 +210,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 			if updateErr != nil {
 				logger.Error("failed to expire booking %d: %v", bookingId, updateErr)
+				return
 			}
 
 			_ = h.store.ReleaseSeatsByBooking(ctx, util.ToPgInt4(int32(bookingId)))
@@ -228,6 +229,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			util.ErrorJson(w, fmt.Errorf("not able to create payment"))
+			return
 		}
 
 		booking, err := h.store.GetBookingById(ctx, int32(bookingId))
