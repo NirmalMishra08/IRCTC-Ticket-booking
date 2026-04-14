@@ -8,6 +8,7 @@ import (
 	"better-uptime/config"
 	"better-uptime/internal/api/auth"
 	"better-uptime/internal/api/booking"
+	"better-uptime/internal/api/cancellation"
 	"better-uptime/internal/api/train"
 	db "better-uptime/internal/db/sqlc"
 
@@ -23,6 +24,7 @@ type Server struct {
 	authHandler    *auth.Handler
 	trainHandler   *train.Handler
 	bookingHandler *booking.Handler
+	cancelHandler *cancellation.Handler
 	kafka          kafka.Producer
 }
 
@@ -51,6 +53,7 @@ func NewServer(store db.Store, cfg *config.Config, rdb redis.Client, kafka kafka
 	server.authHandler = auth.NewHandler(cfg, store)
 	server.bookingHandler = booking.NewHandler(cfg, store, rdb, kafka)
 	server.trainHandler = train.NewHandler(cfg, store)
+	server.cancelHandler = cancellation.NewHandler(cfg, store, kafka);
 
 	// You can now mount auth routes here like:
 	// r.Post("/login", server.authHandler.Login)
