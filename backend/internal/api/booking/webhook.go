@@ -31,13 +31,21 @@ func (h *Handler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 		util.ErrorJson(w, errors.New("bad request"))
 		return
 	}
-
+	fmt.Println("🔥 webhook hit")
 	sig := r.Header.Get("Stripe-Signature")
-	event, err := webhook.ConstructEvent(payload, sig, h.config.STRIPE_WEBHOOK_SECRET)
+	fmt.Println(sig)
+	fmt.Println("🔥 secret", h.config.STRIPE_WEBHOOK_SECRET)
+	event, err := webhook.ConstructEventWithOptions(payload, sig, h.config.STRIPE_WEBHOOK_SECRET,
+	webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
+	
 	if err != nil {
-		util.ErrorJson(w, fmt.Errorf("not able to create event"))
+		util.ErrorJson(w, fmt.Errorf("not able to create event", err),)
 		return
 	}
+
+	fmt.Println("✅ event type:", event.Type)
 
 	switch event.Type {
 	case "checkout.session.completed":

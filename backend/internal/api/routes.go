@@ -13,6 +13,7 @@ func (app *Server) routes() *chi.Mux {
 		r.Mount("/auth", app.authHandler.Routes())
 		r.Mount("/train",app.trainHandler.Routes())
 		r.Mount("/booking",app.bookingHandler.Routes())
+		r.Mount("/cancel", app.cancelHandler.Routes())
 	})
 
 	return router

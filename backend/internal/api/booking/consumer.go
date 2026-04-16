@@ -1,6 +1,7 @@
 package booking
 
 import (
+	db "better-uptime/internal/db/sqlc"
 	"context"
 	"encoding/json"
 	"log"
@@ -9,7 +10,7 @@ import (
 )
 
 type SeatReleasedEvent struct {
-	JourneyId  string `json:"journey_id,omitempty"`
+	JourneyId string `json:"journey_id,omitempty"`
 	CoachType string `json:"coach_type,omitempty"`
 }
 
@@ -57,7 +58,7 @@ func (h *Handler) handleSeatUpgradation(session sarama.ConsumerGroupSession, msg
 		return
 	}
 
-	err := h.PromoteWaitlist(context.Background(), data.JourneyId, data.CoachType)
+	err := h.PromoteWaitlist(context.Background(), data.JourneyId, db.CoachType(data.CoachType))
 	if err != nil {
 		log.Println("seat upgradation failed:", err)
 		return

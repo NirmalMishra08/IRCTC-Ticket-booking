@@ -49,7 +49,7 @@ SELECT b.id, b.userid, b.journey_id, b.booking_type, b.status, b.holdtoken, b.cr
 FROM
 booking b JOIN
 payment p ON b.id = p.bookingId
-WHERE b.journey_id = $2 AND b.userId = $1 AND p.status = "SUCCESS"
+WHERE b.journey_id = $2 AND b.userId = $1 AND p.status = 'SUCCESS'
 `
 
 type GetPaymentAndTrainParams struct {

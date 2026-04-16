@@ -15,7 +15,7 @@ import (
 )
 
 type RefundRequest struct {
-	JourneyID string `json:"train_id" validate:"required"`
+	JourneyID string `json:"journey_id" validate:"required"`
 }
 
 func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +40,8 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	fmt.Println("hello")
+
 	trainWithAmount, err := h.store.GetPaymentAndTrain(ctx, db.GetPaymentAndTrainParams{
 		Userid:    pgtype.UUID{Bytes: userId, Valid: true},
 		JourneyID: util.ToPgInt4(int32(JourneyId)),
@@ -54,10 +56,12 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if trainWithAmount.Status != db.BookingStatusPENDING {
+	if trainWithAmount.Status != db.BookingStatusCONFIRMED {
 		util.ErrorJson(w, fmt.Errorf("no seats were confirmed"))
 		return
 	}
+
+	fmt.Println("hello")
 	// calculate the refund
 	var amount float64
 	amount = trainWithAmount.Amount
@@ -67,7 +71,7 @@ func (h *Handler) CalculatingRefundAmount(w http.ResponseWriter, r *http.Request
 
 	var releasedSeats int64
 
-	apiResponse, err := stripe.RefundSession(ctx, userId.String(), amountStr, trainWithAmount.Holdtoken.String, h.config.REDIS_DB_URL)
+	apiResponse, err := stripe.RefundSession(ctx, userId.String(), amountStr, trainWithAmount.Holdtoken.String, h.config.STRIPE_SECRET_KEY)
 	if err != nil || apiResponse == nil {
 		util.ErrorJson(w, err)
 	}

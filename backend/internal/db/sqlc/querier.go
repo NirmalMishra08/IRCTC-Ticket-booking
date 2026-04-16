@@ -57,6 +57,7 @@ type Querier interface {
 	GetWaitlistBatch(ctx context.Context, arg GetWaitlistBatchParams) ([]Waitlist, error)
 	// below are not applied till now
 	HoldSeat(ctx context.Context, arg HoldSeatParams) error
+	InitializeSeatInventory(ctx context.Context, arg InitializeSeatInventoryParams) error
 	InsertWaitlist(ctx context.Context, arg InsertWaitlistParams) error
 	LockAvailableSeats(ctx context.Context, arg LockAvailableSeatsParams) ([]int32, error)
 	LockTrainForLayout(ctx context.Context, id int32) (int32, error)

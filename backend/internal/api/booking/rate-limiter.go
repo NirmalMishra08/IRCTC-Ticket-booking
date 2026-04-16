@@ -9,6 +9,10 @@ import (
 )
 
 func (h *Handler) RateLimitUser(ctx context.Context, userId string, window time.Duration, maxRequests int) error {
+	if window.Seconds() == 0 {
+		return fmt.Errorf("invalid window duration")
+	}
+	
 	key := fmt.Sprintf("rate_limit:%s:%d", userId, time.Now().Unix()/int64(window.Seconds()))
 
 	// Using pipeline for atomic operation

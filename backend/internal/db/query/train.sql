@@ -124,8 +124,7 @@ AND booking_id = $1;
 -- name: GetNextCoachNumber :one
 SELECT COALESCE(MAX(coachNumber), 0) + 1
 FROM coach
-WHERE trainId = $1
-FOR UPDATE;
+WHERE trainId = $1;
 
 -- name: LockTrainForLayout :one
 SELECT id
@@ -154,5 +153,17 @@ LIMIT sqlc.arg(seat_limit);
 select coach_type 
 from seat_inventory
 WHERE journey_id = $1;
+
+-- name: InitializeSeatInventory :exec
+INSERT INTO seat_inventory (journey_id, seat_id, coach_type, quota, status)
+SELECT 
+    $1,                   
+    s.id,
+    c.coachtype,
+    'NORMAL',              
+    'AVAILABLE'
+FROM seat s
+JOIN coach c ON s.coachId = c.id
+WHERE c.trainId = $2;
 
 

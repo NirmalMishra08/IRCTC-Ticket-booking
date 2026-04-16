@@ -12,14 +12,13 @@ import (
 )
 
 type CreateTrainRequest struct {
-	TrainNumber int       `json:"train_number"`
-	TrainName   string    `json:"train_name"`
-	Source      string    `json:"source"`
-	Destination string    `json:"destination"`
-	Day         string    `json:"day"`
+	TrainNumber int    `json:"train_number"`
+	TrainName   string `json:"train_name"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Day         string `json:"day"`
 	ArrivalTime string `json:"arrival_time"`
 }
-
 
 type CreateTrainResponse struct {
 	Train         db.Train         `json:"train"`
@@ -35,7 +34,7 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	role:= payload.Role
+	role := payload.Role
 	if role != "ADMIN" {
 		util.ErrorJson(w, util.ErrUnauthorized)
 		return
@@ -51,7 +50,7 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 
 	r.Body.Close()
 
-	arrivalGoTime, err := time.Parse("15:04", data.ArrivalTime)
+	arrivalGoTime, err := time.Parse(time.RFC3339, data.ArrivalTime)
 	if err != nil {
 		util.ErrorJson(w, util.ErrNotValidRequest)
 		return
@@ -74,8 +73,8 @@ func (h *Handler) CreateTrain(w http.ResponseWriter, r *http.Request) {
 	trainSchedule, err := h.store.CreateTrainSchedule(ctx, db.CreateTrainScheduleParams{
 		Trainid:       pgtype.Int4{Int32: train.ID, Valid: true},
 		Day:           db.DayOfWeek(data.Day),
-		Arrivaltime:   pgtype.Time{Microseconds: int64(arrivalGoTime.Hour()*3600000 + arrivalGoTime.Minute()*60000 + arrivalGoTime.Second()*1000000), Valid: true},
-		Departuretime: pgtype.Time{Microseconds: int64(departureTime.Hour()*3600000 + departureTime.Minute()*60000 + departureTime.Second()*1000000), Valid: true},
+		Arrivaltime:   arrivalGoTime,
+		Departuretime: departureTime,
 	})
 	if err != nil {
 		util.ErrorJson(w, err)
